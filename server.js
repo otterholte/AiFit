@@ -102,7 +102,7 @@ io.on('connection', (socket) => {
 // ---------------------------------------------------------------------------
 const PORT = 3000;
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
   const interfaces = os.networkInterfaces();
   let lanIP = '<unknown>';
   for (const name of Object.keys(interfaces)) {
@@ -113,15 +113,25 @@ server.listen(PORT, '0.0.0.0', () => {
     }
   }
 
+  const dashUrl = `https://localhost:${PORT}/dashboard`;
+
   console.log('');
   console.log('==========================================');
-  console.log('  Two-Camera Squat POC — Server Running');
+  console.log('  AI FIT — Server Running');
   console.log('==========================================');
-  console.log(`  Dashboard (laptop):  https://localhost:${PORT}/dashboard`);
+  console.log(`  Dashboard (laptop):  ${dashUrl}`);
   console.log(`  Side cam  (phone):   https://${lanIP}:${PORT}/side`);
   console.log('==========================================');
   console.log('  Accept the self-signed cert warning ONCE');
   console.log('  in each browser — it won\'t ask again.');
   console.log('==========================================');
   console.log('');
+
+  // Auto-open dashboard in browser
+  try {
+    const open = (await import('open')).default;
+    open(dashUrl);
+  } catch (_) {
+    // 'open' package not installed — no big deal
+  }
 });

@@ -2,6 +2,9 @@
 
 **AI-powered personal training that just works.** No gym membership, no complicated equipment, no internet required — just plug in and start moving.
 
+> 🌐 **Live Demo:** [https://otterholte.github.io/AiFit/](https://otterholte.github.io/AiFit/)
+> *(front camera only — run locally for full two-camera experience)*
+
 ---
 
 ## What Is AI FIT?
@@ -56,7 +59,7 @@ The system acts as a vocal coach during exercises:
 No remote. No controller. No keyboard needed during a workout.
 - **Right hand cursor** — raise your right hand on the menu to navigate; the cursor follows your wrist with amplified, smoothed tracking so small movements cover the whole screen.
 - **Dwell-to-select** — hold your fist over a menu item or button for 2 seconds to "click" it. A progress ring fills to confirm.
-- **Prayer hands toggle** 🙏 — bring both hands together for 2 seconds to toggle hand tracking on/off. Visual feedback shows progress and confirmation.
+- **Hand tracking toggle** — dedicated button to enable/disable hand tracking on demand.
 - **Raise hand to pause** — during a workout, raise either hand above your head to pause/resume.
 - **Mouse/click fallback** — everything also works with a standard mouse for convenience.
 
@@ -193,39 +196,61 @@ We don't build the wearable — we integrate with the ones you already own.
 
 ---
 
-## Running the Prototype
+## Quick Start (One Command)
 
 ```bash
-# Install dependencies
-npm install
-
-# Start the server
-node server.js
+npm run go
 ```
 
-- **Dashboard**: Open `http://localhost:3000/dashboard.html` on your laptop/PC
-- **Side camera**: Open `http://<your-local-ip>:3000/camera.html` on your phone (connect to same network)
-- Position your phone at a 90° side angle, propped at knee-to-hip height
-- Stand in front of your laptop camera
-- Select "Deep Squat" from the menu and start moving
+That's it. This installs dependencies, starts the HTTPS server, and opens the dashboard in your browser automatically.
+
+> First time? You'll see a browser warning about the self-signed certificate. Click **"Advanced" → "Proceed"** — you only need to do this once.
+
+### Full Two-Camera Setup
+
+1. **Run the server** on your laptop:
+   ```bash
+   npm run go
+   ```
+2. The dashboard opens automatically at `https://localhost:3000/dashboard`
+3. A **QR code** appears in the main menu — scan it with your phone
+4. On your phone, accept the certificate warning once (same as step 1)
+5. **Position your phone** at a 90° side angle, propped at knee-to-hip height
+6. Stand in front of your laptop camera
+7. Select **"Deep Squat"** from the menu and start moving
+
+> **Note:** Your phone and laptop must be on the **same Wi-Fi network**. The QR code automatically uses your laptop's local IP address so the phone can connect.
+
+### GitHub Pages (Demo Mode)
+
+The app also runs at [https://otterholte.github.io/AiFit/](https://otterholte.github.io/AiFit/) — this uses your laptop's front camera only. The side camera (phone) feature requires the local server since it needs Socket.IO to relay data between devices in real time.
 
 ---
 
 ## Project Structure
 
 ```
-AiYogaTracker/
-├── server.js                  # Express + Socket.IO server
-├── package.json               # Dependencies
+AiFit/
+├── server.js                  # Express + Socket.IO HTTPS server (auto-opens browser)
+├── package.json               # Dependencies & npm scripts
+├── index.html                 # GitHub Pages redirect → public/dashboard.html
+├── .nojekyll                  # Tells GitHub Pages not to process with Jekyll
+├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── deploy.yml         # GitHub Pages auto-deploy workflow
 ├── public/
-│   ├── dashboard.html         # Main workout dashboard
-│   ├── camera.html            # Side camera client (phone)
+│   ├── dashboard.html         # Main workout dashboard & menu
+│   ├── side.html              # Side camera page (mobile-optimized for phone)
+│   ├── front.html             # Front camera page
 │   ├── css/
-│   │   └── dashboard.css      # Dashboard styles
+│   │   ├── dashboard.css      # Dashboard & menu styles
+│   │   └── style.css          # Shared camera page styles
 │   ├── js/
-│   │   ├── dashboard.js       # Dashboard logic, gesture control, coaching
+│   │   ├── dashboard.js       # Dashboard logic, gesture control, coaching, QR code
 │   │   ├── squat-detector.js  # Squat state machine & rep counting
-│   │   └── camera-common.js   # Shared camera/pose utilities
+│   │   ├── camera-common.js   # Shared camera/pose detection (MediaPipe)
+│   │   └── qrcode.min.js     # QR code generation library
 │   └── img/
 │       └── DeepSquatExampleGif.webp  # Exercise demonstration
 └── README.md
