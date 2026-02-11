@@ -111,7 +111,13 @@
     .init-overlay.hidden { display: none; }
     .init-emoji { font-size: 3rem; }
     .init-title { font-size: 1.3rem; font-weight: 700; }
-    .init-subtitle { font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; max-width: 300px; }
+    .init-subtitle { font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; max-width: 300px; white-space: pre-line; }
+    .init-tip {
+      font-size: 0.78rem; color: var(--text-dim); line-height: 1.5;
+      max-width: 300px; text-align: left;
+      background: rgba(253,203,110,0.08); border: 1px solid rgba(253,203,110,0.2);
+      border-radius: 10px; padding: 12px 14px; margin-top: 4px;
+    }
     .spinner {
       width: 36px; height: 36px;
       border: 3px solid var(--border);
@@ -141,6 +147,9 @@
     <div class="init-title">Side Camera</div>
     <div class="init-subtitle" id="init-text">Loading pose model…</div>
     <div class="spinner" id="init-spinner"></div>
+    <div class="init-tip" id="init-tip">
+      💡 <strong>First time?</strong> If your browser shows a security warning, tap <strong>"Advanced"</strong> then <strong>"Proceed"</strong> to allow the connection. You'll also need to <strong>allow camera access</strong> when prompted.
+    </div>
   </div>
 
   <!-- Full-screen camera -->

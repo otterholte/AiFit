@@ -206,13 +206,67 @@ async function init() {
 }
 
 // ---------------------------------------------------------------
-// Webcam
+// Webcam — with fallback chain for mobile compatibility
 // ---------------------------------------------------------------
+async function requestCamera(constraints) {
+  return navigator.mediaDevices.getUserMedia(constraints);
+}
+
 async function startCamera() {
+  // Try multiple constraint sets — phones can be picky
+  const attempts = [
+    // 1. Preferred: specific facing mode + resolution
+    { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: currentFacingMode } },
+    // 2. Fallback: facing mode only, let phone pick resolution
+    { video: { facingMode: currentFacingMode } },
+    // 3. Last resort: any camera at all
+    { video: true },
+  ];
+
+  let stream = null;
+  let lastErr = null;
+
+  for (const constraints of attempts) {
+    try {
+      stream = await requestCamera(constraints);
+      break;
+    } catch (err) {
+      lastErr = err;
+      console.warn('Camera attempt failed:', constraints, err.message);
+    }
+  }
+
+  if (!stream) {
+    // All attempts failed — show helpful error
+    let msg;
+    if (lastErr?.name === 'NotAllowedError') {
+      msg = 'Camera blocked — tap the lock icon in your browser address bar and allow camera access, then reload.';
+    } else if (lastErr?.name === 'NotFoundError') {
+      msg = 'No camera found on this device.';
+    } else if (lastErr?.name === 'NotReadableError' || lastErr?.name === 'AbortError') {
+      msg = 'Camera is in use by another app. Close other camera apps and reload.';
+    } else if (window.location.protocol !== 'https:') {
+      msg = 'Camera requires HTTPS. Make sure you\'re accessing this page via https://';
+    } else {
+      msg = 'Could not start camera: ' + (lastErr?.message || 'unknown error');
+    }
+
+    // Check if this might be a certificate issue
+    if (window.location.protocol === 'https:' && window.location.hostname !== 'localhost') {
+      msg += '\n\nTip: If you just scanned a QR code, you may need to accept the security certificate first. Try opening the URL directly in your browser, accept the warning, then come back.';
+    }
+
+    updateStatus(msg);
+    if (initText) {
+      initText.textContent = msg;
+      initText.style.whiteSpace = 'pre-line';
+    }
+    if (initSpinner) initSpinner.style.display = 'none';
+    console.error('All camera attempts failed:', lastErr);
+    return;
+  }
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: currentFacingMode },
-    });
     video.srcObject = stream;
 
     await new Promise((resolve) => {
