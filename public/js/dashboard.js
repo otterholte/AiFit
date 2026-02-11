@@ -989,23 +989,50 @@ document.querySelectorAll('.end-btn.selectable').forEach((btn) => {
 // ==========================================================================
 // 16. QR CODE FOR PHONE CAMERA
 // ==========================================================================
-(function generateMenuQR() {
-  const qrBox = document.getElementById('qr-box');
-  if (!qrBox || typeof qrcodegen === 'undefined' && typeof qrcode === 'undefined') return;
+const qrBox  = document.getElementById('qr-box');
+const qrNote = document.getElementById('qr-note');
 
-  // Build the URL to the side camera page
+async function generateMenuQR() {
+  if (!qrBox || (typeof qrcodegen === 'undefined' && typeof qrcode === 'undefined')) return;
+
+  let sideUrl;
   const loc = window.location;
-  // If running on localhost/LAN, use the same host; on GitHub Pages use the pages URL
-  const basePath = loc.pathname.replace(/\/[^/]*$/, '/'); // directory of current page
-  const sideUrl = loc.protocol + '//' + loc.host + basePath + 'side.html';
+  const isLocal = loc.hostname === 'localhost' || loc.hostname === '127.0.0.1' || /^\d+\.\d+\.\d+\.\d+$/.test(loc.hostname);
+
+  if (isLocal) {
+    // Running locally via node server.js — try to get LAN IP from server
+    try {
+      const resp = await fetch('/api/lan-ip');
+      const data = await resp.json();
+      if (data.ip) {
+        sideUrl = `https://${data.ip}:${data.port}/side.html`;
+      } else {
+        // Fallback: use current host (works if user already accessed via LAN IP)
+        const basePath = loc.pathname.replace(/\/[^/]*$/, '/');
+        sideUrl = loc.protocol + '//' + loc.host + basePath + 'side.html';
+      }
+    } catch (_) {
+      // API not available — use current host
+      const basePath = loc.pathname.replace(/\/[^/]*$/, '/');
+      sideUrl = loc.protocol + '//' + loc.host + basePath + 'side.html';
+    }
+  } else {
+    // GitHub Pages or other static hosting — side camera won't relay data
+    // Still show QR but add a note about needing local server
+    const basePath = loc.pathname.replace(/\/[^/]*$/, '/');
+    sideUrl = loc.protocol + '//' + loc.host + basePath + 'side.html';
+
+    if (qrNote) {
+      qrNote.innerHTML = '⚠️ Side camera needs local server<br><code>node server.js</code> for live tracking';
+      qrNote.style.color = '#fdcb6e';
+    }
+  }
 
   try {
-    // qrcode-generator library API
     const qr = qrcode(0, 'M');
     qr.addData(sideUrl);
     qr.make();
     qrBox.innerHTML = qr.createSvgTag({ cellSize: 3, margin: 2, scalable: true });
-    // Style the generated SVG
     const svg = qrBox.querySelector('svg');
     if (svg) {
       svg.style.width = '80px';
@@ -1014,11 +1041,13 @@ document.querySelectorAll('.end-btn.selectable').forEach((btn) => {
       svg.style.background = '#fff';
       svg.style.padding = '4px';
     }
+    console.log('QR code URL:', sideUrl);
   } catch (e) {
     console.warn('QR generation failed:', e);
     qrBox.style.display = 'none';
   }
-})();
+}
+generateMenuQR();
 
 // ==========================================================================
 // GO

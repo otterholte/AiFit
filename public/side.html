@@ -2,43 +2,194 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Squat POC — Side Camera</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>AI FIT — Side Camera</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3a;
+      --text: #e4e6f0;
+      --text-dim: #8b8fa3;
+      --accent: #6c5ce7;
+      --green: #00d2a0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%; width: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      touch-action: none;            /* prevent pinch-zoom */
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* Full-screen camera feed */
+    .cam-fullscreen {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #000;
+    }
+    .cam-fullscreen video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .cam-fullscreen canvas {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+    }
+
+    /* Status bar at top */
+    .status-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+    }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.8rem; font-weight: 600;
+      padding: 6px 12px; border-radius: 20px;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    .status-dot.offline {
+      background: #e74c3c;
+      box-shadow: 0 0 6px #e74c3c;
+      animation: none;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .brand-mini {
+      font-weight: 700; font-size: 0.85rem;
+      color: rgba(255,255,255,0.6);
+    }
+
+    /* Switch camera button at bottom */
+    .bottom-controls {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px 16px 28px;
+      background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+    }
+    .switch-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 24px; border-radius: 30px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(8px);
+      color: var(--text); font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .switch-btn:active {
+      background: rgba(255,255,255,0.2);
+      transform: scale(0.96);
+    }
+
+    /* Connecting / error overlay */
+    .init-overlay {
+      position: fixed; inset: 0; z-index: 20;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--bg);
+      text-align: center; padding: 24px;
+      gap: 16px;
+    }
+    .init-overlay.hidden { display: none; }
+    .init-emoji { font-size: 3rem; }
+    .init-title { font-size: 1.3rem; font-weight: 700; }
+    .init-subtitle { font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; max-width: 300px; }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* No server warning */
+    .no-server-msg {
+      position: fixed; bottom: 80px; left: 16px; right: 16px; z-index: 15;
+      background: rgba(253, 203, 110, 0.12);
+      border: 1px solid rgba(253, 203, 110, 0.3);
+      border-radius: 12px; padding: 12px 16px;
+      text-align: center; font-size: 0.8rem; color: #fdcb6e;
+      line-height: 1.4;
+    }
+    .no-server-msg.hidden { display: none; }
+  </style>
 </head>
 <body>
-  <div class="camera-container">
-    <h1>Side Camera (Phone)</h1>
 
-    <div class="cam-status">
-      <span class="label">Status:</span>
-      <span id="status-text">Initializing…</span>
-    </div>
-
-    <button id="switch-camera-btn" class="switch-cam-button">Switch Camera</button>
-
-    <div class="video-wrapper">
-      <!-- Side camera is NOT mirrored (environment / back camera) -->
-      <video id="webcam" playsinline muted></video>
-      <canvas id="overlay"></canvas>
-    </div>
+  <!-- Init overlay (shown while loading) -->
+  <div id="init-overlay" class="init-overlay">
+    <div class="init-emoji">📷</div>
+    <div class="init-title">Side Camera</div>
+    <div class="init-subtitle" id="init-text">Loading pose model…</div>
+    <div class="spinner" id="init-spinner"></div>
   </div>
 
-  <!-- Socket.IO client: try local server, fall back to CDN, gracefully degrade -->
+  <!-- Full-screen camera -->
+  <div class="cam-fullscreen">
+    <video id="webcam" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <!-- Top status bar -->
+  <div class="status-bar">
+    <div class="status-badge">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">Connecting…</span>
+    </div>
+    <span class="brand-mini">AI FIT</span>
+  </div>
+
+  <!-- Bottom controls -->
+  <div class="bottom-controls">
+    <button id="switch-camera-btn" class="switch-btn">🔄 Switch Camera</button>
+  </div>
+
+  <!-- No-server warning (shown on GitHub Pages) -->
+  <div id="no-server-msg" class="no-server-msg hidden">
+    ⚠️ Camera is active but <strong>no server detected</strong>.<br>
+    Run <code>node server.js</code> on your laptop and open the dashboard from there.
+  </div>
+
+  <!-- Socket.IO: try local, gracefully degrade -->
   <script src="socket.io/socket.io.js"
           onerror="
             var s=document.createElement('script');
             s.src='https://cdn.socket.io/4.8.1/socket.io.min.js';
             s.onerror=function(){
-              window.io=function(){
-                var noop=function(){};
-                return {emit:noop,on:noop,off:noop,connect:noop,disconnect:noop};
-              };
+              window.io=null;
+              window.__noServer=true;
+            };
+            s.onload=function(){
+              // CDN loaded but we have no local server — check connectivity
+              try {
+                var testSocket = io({timeout:3000, reconnectionAttempts:1});
+                testSocket.on('connect_error', function(){
+                  window.__noServer=true;
+                  testSocket.disconnect();
+                });
+              } catch(e){ window.__noServer=true; }
             };
             document.head.appendChild(s);
           "></script>
-  <!-- Camera + MediaPipe logic (ES module) -->
   <script type="module" src="js/camera-common.js"></script>
 </body>
 </html>
-

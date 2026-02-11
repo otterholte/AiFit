@@ -46,6 +46,20 @@ app.get('/dashboard', (_req, res) => res.sendFile(path.join(__dirname, 'public',
 app.get('/front',     (_req, res) => res.sendFile(path.join(__dirname, 'public', 'front.html')));
 app.get('/side',      (_req, res) => res.sendFile(path.join(__dirname, 'public', 'side.html')));
 
+// API: return LAN IP so QR code points to the right address for phones
+app.get('/api/lan-ip', (_req, res) => {
+  const interfaces = os.networkInterfaces();
+  let lanIP = null;
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        lanIP = iface.address;
+      }
+    }
+  }
+  res.json({ ip: lanIP, port: PORT });
+});
+
 // ---------------------------------------------------------------------------
 // 3. HTTPS server + Socket.IO
 // ---------------------------------------------------------------------------

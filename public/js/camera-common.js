@@ -30,6 +30,13 @@ const canvas     = document.getElementById('overlay');
 const ctx        = canvas.getContext('2d');
 const statusText = document.getElementById('status-text');
 
+// Side page mobile elements
+const initOverlay  = document.getElementById('init-overlay');
+const initText     = document.getElementById('init-text');
+const initSpinner  = document.getElementById('init-spinner');
+const statusDot    = document.getElementById('status-dot');
+const noServerMsg  = document.getElementById('no-server-msg');
+
 // ---------------------------------------------------------------
 // Landmark indices
 // ---------------------------------------------------------------
@@ -65,8 +72,47 @@ const BODY_INDICES = [11, 12, 23, 24, 25, 26, 27, 28];
 // ---------------------------------------------------------------
 const _noop = () => {};
 const _noopSocket = { emit: _noop, on: _noop, off: _noop, connect: _noop, disconnect: _noop };
-const socket = (typeof window.io === 'function') ? window.io() : _noopSocket;
-try { socket.emit('register', source); } catch (_) { /* no server */ }
+
+let socketConnected = false;
+let socket;
+
+try {
+  socket = (typeof window.io === 'function') ? window.io() : _noopSocket;
+  socket.emit('register', source);
+
+  // Track connection state
+  if (socket !== _noopSocket) {
+    socket.on('connect', () => {
+      socketConnected = true;
+      if (statusDot) statusDot.classList.remove('offline');
+      if (noServerMsg) noServerMsg.classList.add('hidden');
+      updateStatus('Connected to dashboard');
+    });
+    socket.on('disconnect', () => {
+      socketConnected = false;
+      if (statusDot) statusDot.classList.add('offline');
+      updateStatus('Disconnected from dashboard');
+    });
+    socket.on('connect_error', () => {
+      socketConnected = false;
+      if (statusDot) statusDot.classList.add('offline');
+      showNoServerWarning();
+    });
+  } else {
+    showNoServerWarning();
+  }
+} catch (_) {
+  socket = _noopSocket;
+  showNoServerWarning();
+}
+
+function showNoServerWarning() {
+  if (noServerMsg) noServerMsg.classList.remove('hidden');
+}
+
+function updateStatus(text) {
+  if (statusText) statusText.textContent = text;
+}
 
 // ---------------------------------------------------------------
 // Camera state
@@ -130,7 +176,9 @@ function validatePose(landmarks) {
 // Init
 // ---------------------------------------------------------------
 async function init() {
-  statusText.textContent = 'Loading pose model…';
+  updateStatus('Loading pose model…');
+  if (initText) initText.textContent = 'Loading pose model…';
+
   try {
     const vision = await FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm',
@@ -144,10 +192,15 @@ async function init() {
       runningMode: 'VIDEO',
       numPoses: 1,
     });
-    statusText.textContent = 'Model loaded. Starting camera…';
+
+    updateStatus('Starting camera…');
+    if (initText) initText.textContent = 'Starting camera…';
     await startCamera();
   } catch (err) {
-    statusText.textContent = 'Error: ' + err.message;
+    const msg = 'Error: ' + err.message;
+    updateStatus(msg);
+    if (initText) initText.textContent = msg;
+    if (initSpinner) initSpinner.style.display = 'none';
     console.error(err);
   }
 }
@@ -179,13 +232,20 @@ async function startCamera() {
     video.classList.toggle('mirror', isFront);
     canvas.classList.toggle('mirror', isFront);
 
-    statusText.textContent = 'Tracking active';
+    updateStatus('Tracking active');
+    // Hide init overlay (mobile side page)
+    if (initOverlay) initOverlay.classList.add('hidden');
+    if (statusDot && socketConnected) statusDot.classList.remove('offline');
+
     lastVideoTime = -1;
     movementBuffer.length = 0;
 
     if (!detecting) { detecting = true; detectLoop(); }
   } catch (err) {
-    statusText.textContent = 'Camera error: ' + err.message;
+    const msg = 'Camera error: ' + err.message;
+    updateStatus(msg);
+    if (initText) initText.textContent = msg;
+    if (initSpinner) initSpinner.style.display = 'none';
     console.error(err);
   }
 }
@@ -194,7 +254,7 @@ async function startCamera() {
 // Switch camera (side page)
 // ---------------------------------------------------------------
 async function switchCamera() {
-  statusText.textContent = 'Switching camera…';
+  updateStatus('Switching camera…');
   const tracks = video.srcObject?.getTracks();
   if (tracks) tracks.forEach((t) => t.stop());
   currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
@@ -215,6 +275,7 @@ const thumbCtx = thumbCanvas.getContext('2d');
 let lastFrameSentAt = 0;
 
 function maybeSendFrame() {
+  if (!socketConnected) return;  // skip if no server
   const now = performance.now();
   if (now - lastFrameSentAt < FRAME_SEND_INTERVAL_MS) return;
   lastFrameSentAt = now;
@@ -297,6 +358,7 @@ function pickBestSide(landmarks) {
 }
 
 function sendLandmarks(landmarks, poseValid) {
+  if (!socketConnected) return;  // skip if no server
   const best = pickBestSide(landmarks);
   socket.emit('pose-data', {
     source,
