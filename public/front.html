@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Squat POC — Front Camera</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="camera-container">
+    <h1>Front Camera (Laptop)</h1>
+
+    <div class="cam-status">
+      <span class="label">Status:</span>
+      <span id="status-text">Initializing…</span>
+    </div>
+
+    <div class="video-wrapper">
+      <!-- Mirror the front (user-facing) camera so it feels natural -->
+      <video id="webcam" class="mirror" playsinline muted></video>
+      <canvas id="overlay" class="mirror"></canvas>
+    </div>
+  </div>
+
+  <!-- Socket.IO client -->
+  <script src="socket.io/socket.io.js"
+          onerror="
+            var s=document.createElement('script');
+            s.src='https://cdn.socket.io/4.8.1/socket.io.min.js';
+            s.onerror=function(){
+              window.io=function(){
+                var noop=function(){};
+                return {emit:noop,on:noop,off:noop,connect:noop,disconnect:noop};
+              };
+            };
+            document.head.appendChild(s);
+          "></script>
+  <!-- Camera + MediaPipe logic (ES module) -->
+  <script type="module" src="js/camera-common.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Squat POC — Side Camera</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="camera-container">
+    <h1>Side Camera (Phone)</h1>
+
+    <div class="cam-status">
+      <span class="label">Status:</span>
+      <span id="status-text">Initializing…</span>
+    </div>
+
+    <button id="switch-camera-btn" class="switch-cam-button">Switch Camera</button>
+
+    <div class="video-wrapper">
+      <!-- Side camera is NOT mirrored (environment / back camera) -->
+      <video id="webcam" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+    </div>
+  </div>
+
+  <!-- Socket.IO client: try local server, fall back to CDN, gracefully degrade -->
+  <script src="socket.io/socket.io.js"
+          onerror="
+            var s=document.createElement('script');
+            s.src='https://cdn.socket.io/4.8.1/socket.io.min.js';
+            s.onerror=function(){
+              window.io=function(){
+                var noop=function(){};
+                return {emit:noop,on:noop,off:noop,connect:noop,disconnect:noop};
+              };
+            };
+            document.head.appendChild(s);
+          "></script>
+  <!-- Camera + MediaPipe logic (ES module) -->
+  <script type="module" src="js/camera-common.js"></script>
+</body>
+</html>
+

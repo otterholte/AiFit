@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI FIT — Dashboard</title>
+  <link rel="stylesheet" href="css/dashboard.css" />
+</head>
+<body>
+  <!-- ============================================================
+       MAIN MENU (shown at start — select a workout)
+       ============================================================ -->
+  <div id="main-menu" class="main-menu">
+    <header class="menu-bar">
+      <div class="brand"><span class="brand-icon">◉</span> AI FIT</div>
+    </header>
+
+    <div class="menu-body">
+      <h1 class="menu-title">Choose Your Workout</h1>
+      <p class="menu-instruction">
+        ✊ Hold your fist over a workout for 2 seconds to start — or click with mouse
+      </p>
+
+      <!-- QR code for phone camera -->
+      <div class="menu-qr" id="menu-qr">
+        <div class="qr-box" id="qr-box"></div>
+        <span class="qr-label">📱 Scan with your phone to connect the side camera</span>
+      </div>
+
+      <div class="menu-grid">
+        <!-- Active workout -->
+        <div class="menu-card selectable" data-workout="deep-squat">
+          <div class="select-ring">
+            <svg viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="45" />
+              <circle class="ring-fill" cx="50" cy="50" r="45" />
+            </svg>
+          </div>
+          <div class="card-emoji">🏋️</div>
+          <h2 class="card-title">Deep Squat</h2>
+          <span class="card-badge">3 × 10 reps</span>
+          <p class="card-desc">Build lower body strength with proper depth and form</p>
+        </div>
+
+        <!-- Coming soon -->
+        <div class="menu-card coming-soon">
+          <div class="card-emoji">🦵</div>
+          <h2 class="card-title">Lower Body Blast</h2>
+          <span class="card-badge soon-badge">Coming Soon</span>
+          <p class="card-desc">Squats, lunges &amp; calf raises for complete leg work</p>
+        </div>
+
+        <div class="menu-card coming-soon">
+          <div class="card-emoji">🔥</div>
+          <h2 class="card-title">Full Body Burn</h2>
+          <span class="card-badge soon-badge">Coming Soon</span>
+          <p class="card-desc">Head-to-toe compound movements for max calorie burn</p>
+        </div>
+
+        <div class="menu-card coming-soon">
+          <div class="card-emoji">💪</div>
+          <h2 class="card-title">Upper Body Power</h2>
+          <span class="card-badge soon-badge">Coming Soon</span>
+          <p class="card-desc">Push-ups, shoulder presses &amp; arm circuits</p>
+        </div>
+
+        <div class="menu-card coming-soon">
+          <div class="card-emoji">🧱</div>
+          <h2 class="card-title">Core Crusher</h2>
+          <span class="card-badge soon-badge">Coming Soon</span>
+          <p class="card-desc">Planks, crunches &amp; rotational core stability</p>
+        </div>
+
+        <div class="menu-card coming-soon">
+          <div class="card-emoji">🧘</div>
+          <h2 class="card-title">Recovery &amp; Mobility</h2>
+          <span class="card-badge soon-badge">Coming Soon</span>
+          <p class="card-desc">Gentle stretches &amp; mobility for active recovery days</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera preview (bottom-right corner during menu) -->
+  <div id="menu-cam-preview" class="menu-cam-preview">
+    <canvas id="menu-cam-canvas"></canvas>
+    <span class="preview-label">YOUR CAMERA</span>
+  </div>
+
+  <!-- Gesture cursor (follows hand on menu) -->
+  <div id="gesture-cursor" class="gesture-cursor">
+    <svg viewBox="0 0 60 60">
+      <circle class="cursor-bg-ring" cx="30" cy="30" r="26" />
+      <circle class="cursor-fill-ring" cx="30" cy="30" r="26" />
+    </svg>
+    <span class="cursor-dot"></span>
+  </div>
+
+  <!-- ============================================================
+       WORKOUT UI
+       ============================================================ -->
+  <div class="app" id="workout-app">
+
+    <!-- ── Top bar ── -->
+    <header class="top-bar">
+      <div class="brand"><span class="brand-icon">◉</span> AI FIT</div>
+      <div class="top-center">
+        <span class="gesture-hint">✋ Raise hand to pause</span>
+      </div>
+      <div class="top-right">
+        <button id="back-to-menu-btn" class="top-bar-btn" title="Back to main menu">🏠</button>
+        <button id="hand-track-toggle" class="hand-track-toggle" title="Hand tracking ON">✋</button>
+        <button id="help-btn" class="help-btn" title="Camera setup tips">?</button>
+        <span class="connection-dot" id="front-dot" title="Front camera"></span>
+        <span class="connection-dot" id="side-dot" title="Side camera"></span>
+      </div>
+    </header>
+
+    <!-- ── Main ── -->
+    <main class="main">
+
+      <!-- Left: exercise info + demo -->
+      <section class="exercise-panel">
+        <!-- Demo gif/video background -->
+        <div class="exercise-demo">
+          <img id="exercise-demo-img" class="demo-gif" src="img/DeepSquatExampleGif.webp" alt="Deep Squat demonstration" />
+          <button id="gif-pause-btn" class="gif-pause-btn" title="Pause/play demo">⏸</button>
+          <div class="demo-placeholder" id="demo-placeholder">
+            <!-- Animated squat silhouette (plays until a custom gif is loaded) -->
+            <div class="squat-anim">
+              <div class="squat-figure">
+                <div class="figure-head"></div>
+                <div class="figure-torso"></div>
+                <div class="figure-arm figure-arm-l"></div>
+                <div class="figure-arm figure-arm-r"></div>
+                <div class="figure-thigh figure-thigh-l"></div>
+                <div class="figure-thigh figure-thigh-r"></div>
+                <div class="figure-shin figure-shin-l"></div>
+                <div class="figure-shin figure-shin-r"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info overlay on top of demo -->
+        <div class="exercise-info">
+          <h1 class="exercise-name">Deep Squat</h1>
+          <div class="rep-line">
+            <span id="rep-count" class="rep-num">0</span>
+            <span class="rep-slash"> / </span>
+            <span id="reps-target" class="rep-target">10</span>
+          </div>
+          <div class="set-line" id="set-info">Set 1 of 3</div>
+
+          <!-- Set progress dots -->
+          <div class="set-dots" id="set-dots">
+            <span class="set-dot active"></span>
+            <span class="set-dot"></span>
+            <span class="set-dot"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: camera feeds -->
+      <aside class="feeds">
+        <div class="feed" id="front-feed-card">
+          <span class="feed-label">FRONT VIEW</span>
+          <video id="front-webcam" class="mirror" playsinline muted></video>
+          <canvas id="front-overlay" class="mirror"></canvas>
+          <div id="front-placeholder" class="feed-placeholder">Starting camera…</div>
+        </div>
+        <div class="feed" id="side-feed-card">
+          <span class="feed-label side-label">SIDE VIEW</span>
+          <img id="side-feed" class="feed-img" alt="Side camera" />
+          <div id="side-placeholder" class="feed-placeholder">Waiting for phone…</div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- ── Bottom bar ── -->
+    <footer class="bottom-bar">
+      <div class="bottom-left">
+        <span class="timer-label">SET TIMER</span>
+        <span id="timer" class="timer-value">00:00</span>
+      </div>
+      <div class="bottom-center">
+        <span id="coaching-cue" class="coaching-cue">Connect side camera to begin</span>
+      </div>
+      <div class="bottom-right">
+        <span id="feedback" class="feedback"></span>
+        <button id="reset-btn" class="reset-btn">Reset</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Pause overlay (semi-transparent — stats visible behind) -->
+  <div id="pause-overlay" class="pause-overlay" style="display:none;">
+    <!-- Stats strip so you can still see workout progress -->
+    <div class="pause-stats">
+      <div class="pause-stat">
+        <span class="pause-stat-label">REPS</span>
+        <span id="pause-reps" class="pause-stat-value">0 / 10</span>
+      </div>
+      <div class="pause-stat">
+        <span class="pause-stat-label">SET</span>
+        <span id="pause-set" class="pause-stat-value">Set 1 of 3</span>
+      </div>
+      <div class="pause-stat">
+        <span class="pause-stat-label">TIME</span>
+        <span id="pause-timer" class="pause-stat-value">00:00</span>
+      </div>
+    </div>
+
+    <div class="pause-content">
+      <div class="pause-icon">⏸</div>
+      <div class="pause-text">Paused</div>
+      <div class="pause-hint">Raise hand or tap below to resume</div>
+      <button id="resume-btn" class="resume-btn">▶ Resume Workout</button>
+    </div>
+  </div>
+
+  <!-- Camera setup tips (shown when side camera first connects) -->
+  <div id="camera-tips" class="camera-tips" style="display:none;">
+    <div class="tips-header">
+      <span class="tips-icon">📐</span>
+      <span class="tips-title">Camera Setup Tips</span>
+      <button id="dismiss-tips" class="dismiss-tips-btn">✕</button>
+    </div>
+    <ul class="tips-list">
+      <li><strong>Height:</strong> Place phone at hip height (2–3 ft off the ground, e.g. on a chair or shelf)</li>
+      <li><strong>Position:</strong> Directly to your side, 6–8 feet away</li>
+      <li><strong>Angle:</strong> Tilt slightly downward so your full body (head to feet) is visible</li>
+      <li><strong>Lighting:</strong> Face a light source — avoid backlight / windows behind you</li>
+    </ul>
+  </div>
+
+  <!-- Tracking warning -->
+  <div id="tracking-warning" class="tracking-overlay" style="display:none;">
+    Adjust your position — body not fully visible
+  </div>
+
+  <!-- Set complete overlay -->
+  <div id="set-complete-overlay" class="set-complete-overlay" style="display:none;">
+    <div class="set-complete-text" id="set-complete-text">Set Complete!</div>
+  </div>
+
+  <!-- Workout-complete end screen -->
+  <div id="workout-end-screen" class="workout-end-screen" style="display:none;">
+    <div class="end-content">
+      <div class="end-emoji">🎉</div>
+      <h1 class="end-title">Workout Complete!</h1>
+      <p class="end-subtitle">Great job finishing your Deep Squat session</p>
+
+      <div class="end-buttons">
+        <div class="end-btn selectable" id="end-btn-again" data-action="again">
+          <div class="select-ring">
+            <svg viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="45" />
+              <circle class="ring-fill" cx="50" cy="50" r="45" />
+            </svg>
+          </div>
+          <span class="end-btn-icon">🔄</span>
+          <span class="end-btn-label">Do It Again</span>
+        </div>
+        <div class="end-btn selectable" id="end-btn-menu" data-action="menu">
+          <div class="select-ring">
+            <svg viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="45" />
+              <circle class="ring-fill" cx="50" cy="50" r="45" />
+            </svg>
+          </div>
+          <span class="end-btn-icon">🏠</span>
+          <span class="end-btn-label">Main Menu</span>
+        </div>
+      </div>
+
+      <p class="end-hint">✊ Hold fist over a button for 2 seconds — or click</p>
+    </div>
+  </div>
+
+  <!-- Help tooltip popup -->
+  <div id="help-tooltip" class="help-tooltip" style="display:none;">
+    Press <strong>?</strong> for camera setup tips
+  </div>
+
+
+  <!-- Scripts -->
+  <!-- Socket.IO: try local server first, fall back to CDN, gracefully degrade if neither -->
+  <script src="socket.io/socket.io.js"
+          onerror="
+            var s=document.createElement('script');
+            s.src='https://cdn.socket.io/4.8.1/socket.io.min.js';
+            s.onerror=function(){
+              window.io=function(){
+                var noop=function(){};
+                return {emit:noop,on:noop,off:noop,connect:noop,disconnect:noop};
+              };
+            };
+            document.head.appendChild(s);
+          "></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <!-- QR code generator -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script src="js/squat-detector.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "ai-yoga-tracker-poc",
+  "version": "0.1.0",
+  "description": "Two-camera squat counting proof of concept using MediaPipe Pose",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "selfsigned": "^2.4.1",
+    "socket.io": "^4.8.1"
+  }
+}
+
+
