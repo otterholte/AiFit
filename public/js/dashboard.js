@@ -205,7 +205,11 @@ function frontDetectLoop() {
 
   if (results.landmarks && results.landmarks.length > 0) {
     const lm = results.landmarks[0];
-    drawSkeleton(frontCtx, frontCanvas.width, frontCanvas.height, lm);
+
+    // Only draw skeleton overlay when hand tracking is on
+    if (handTrackingOn) {
+      drawSkeleton(frontCtx, frontCanvas.width, frontCanvas.height, lm);
+    }
 
     if (menuActive || endScreenActive) {
       drawMenuPreview(lm);
@@ -285,18 +289,29 @@ if (resumeBtn) {
 // ==========================================================================
 // 2b. HAND TRACKING TOGGLE BUTTON
 // ==========================================================================
-const handTrackToggleBtn = document.getElementById('hand-track-toggle');
-if (handTrackToggleBtn) {
-  handTrackToggleBtn.addEventListener('click', () => {
-    handTrackingOn = !handTrackingOn;
-    handTrackToggleBtn.classList.toggle('off', !handTrackingOn);
-    handTrackToggleBtn.title = handTrackingOn ? 'Hand tracking ON' : 'Hand tracking OFF';
-    if (!handTrackingOn) {
-      hideGestureCursor();
-      clearMenuHover();
-    }
+const handTrackToggleBtn     = document.getElementById('hand-track-toggle');
+const menuHandTrackToggleBtn = document.getElementById('menu-hand-track-toggle');
+
+function syncTrackingButtons() {
+  const title = handTrackingOn ? 'Hand tracking ON' : 'Hand tracking OFF';
+  [handTrackToggleBtn, menuHandTrackToggleBtn].forEach(btn => {
+    if (!btn) return;
+    btn.classList.toggle('off', !handTrackingOn);
+    btn.title = title;
   });
+  if (!handTrackingOn) {
+    hideGestureCursor();
+    clearMenuHover();
+  }
 }
+
+function toggleHandTracking() {
+  handTrackingOn = !handTrackingOn;
+  syncTrackingButtons();
+}
+
+if (handTrackToggleBtn)     handTrackToggleBtn.addEventListener('click', toggleHandTracking);
+if (menuHandTrackToggleBtn) menuHandTrackToggleBtn.addEventListener('click', toggleHandTracking);
 
 // ==========================================================================
 // 3. SIDE CAMERA (via Socket.IO)
@@ -658,7 +673,7 @@ function drawMenuPreview(lm) {
     menuCamCtx.drawImage(frontVideo, 0, 0, w, h);
   }
 
-  if (!lm) return;
+  if (!lm || !handTrackingOn) return;
 
   // Draw skeleton lines
   menuCamCtx.strokeStyle = 'rgba(124,108,240,0.7)';
