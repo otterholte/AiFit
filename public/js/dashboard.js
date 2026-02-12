@@ -402,25 +402,35 @@ socket.on('pose-update', (data) => {
     // ---- Accumulate per-rep form metrics ----
     const { kneeAngle } = result;
     if (kneeAngle !== null) {
+      // Track minimum knee angle (deepest point of the rep)
       if (repMinKneeAngle === null || kneeAngle < repMinKneeAngle) {
         repMinKneeAngle = kneeAngle;
-        // Snapshot valgus at the deepest point
-        if (latestFrontValgusRatio !== null) {
+      }
+
+      // Track worst (lowest) valgus ratio throughout the entire rep
+      if (latestFrontValgusRatio !== null) {
+        if (repKneeValgusRatio === null || latestFrontValgusRatio < repKneeValgusRatio) {
           repKneeValgusRatio = latestFrontValgusRatio;
         }
       }
-      // Forward lean: how far hip.x is ahead of ankle.x (side view, normalised)
+
+      // Forward lean: use shoulder-to-hip horizontal offset (torso angle)
+      // Falls back to hip-to-ankle if shoulder data is missing
+      const shoulder = data.landmarks.shoulder;
       const hip = data.landmarks.hip;
       const ankle = data.landmarks.ankle;
-      if (hip && ankle) {
-        const lean = hip.x - ankle.x; // positive = leaning forward
+      if (shoulder && hip && shoulder.visibility > 0.3) {
+        // Shoulder X forward of hip X = forward lean (direction-independent)
+        const lean = Math.abs(shoulder.x - hip.x);
+        if (lean > repMaxForwardLean) repMaxForwardLean = lean;
+      } else if (hip && ankle) {
+        const lean = Math.abs(hip.x - ankle.x);
         if (lean > repMaxForwardLean) repMaxForwardLean = lean;
       }
     }
-    // Hold time accumulation (when at depth)
+    // Hold time accumulation (only when at depth)
     if (reachedTargetDepth && kneeAngle !== null && kneeAngle <= TARGET_DEPTH_ANGLE) {
-      // Approximate: each pose-update is ~33ms at 30fps
-      repHoldMs += 33;
+      repHoldMs += 33; // ~33ms per frame at 30fps
     }
 
     updateCoaching(result, setReps);
@@ -530,12 +540,20 @@ function updateCoaching(result, setReps) {
       lastDepthPhase     = '';
 
       // ---- Form Coach: evaluate this rep ----
-      const coachResult = formCoach.recordRep({
+      const repMetrics = {
         minKneeAngle:    repMinKneeAngle,
         maxForwardLean:  repMaxForwardLean,
         kneeValgusRatio: repKneeValgusRatio,
         holdMs:          repHoldMs,
-      });
+      };
+      console.log('[FormCoach] Rep metrics:', repMetrics);
+      const coachResult = formCoach.recordRep(repMetrics);
+      if (coachResult.correction) {
+        console.log('[FormCoach] Correction:', coachResult.correction, '| Watch:', [...coachResult.watchIssues]);
+      }
+      if (coachResult.clearedIssues.length > 0) {
+        console.log('[FormCoach] Cleared:', coachResult.clearedIssues);
+      }
       // Reset per-rep accumulators for next rep
       repMinKneeAngle   = null;
       repMaxForwardLean  = 0;

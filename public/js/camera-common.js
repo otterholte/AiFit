@@ -412,9 +412,10 @@ function pickBestSide(landmarks) {
   const rv = landmarks[LM.RIGHT_HIP].visibility + landmarks[LM.RIGHT_KNEE].visibility + landmarks[LM.RIGHT_ANKLE].visibility;
   const use = rv > lv ? 'RIGHT' : 'LEFT';
   return {
-    hip:   landmarks[use === 'RIGHT' ? LM.RIGHT_HIP : LM.LEFT_HIP],
-    knee:  landmarks[use === 'RIGHT' ? LM.RIGHT_KNEE : LM.LEFT_KNEE],
-    ankle: landmarks[use === 'RIGHT' ? LM.RIGHT_ANKLE : LM.LEFT_ANKLE],
+    shoulder: landmarks[use === 'RIGHT' ? UPPER.RIGHT_SHOULDER : UPPER.LEFT_SHOULDER],
+    hip:      landmarks[use === 'RIGHT' ? LM.RIGHT_HIP : LM.LEFT_HIP],
+    knee:     landmarks[use === 'RIGHT' ? LM.RIGHT_KNEE : LM.LEFT_KNEE],
+    ankle:    landmarks[use === 'RIGHT' ? LM.RIGHT_ANKLE : LM.LEFT_ANKLE],
   };
 }
 
@@ -426,9 +427,10 @@ function sendLandmarks(landmarks, poseValid) {
     timestamp: Date.now(),
     poseValid,
     landmarks: {
-      hip:   { x: best.hip.x,   y: best.hip.y,   visibility: best.hip.visibility },
-      knee:  { x: best.knee.x,  y: best.knee.y,  visibility: best.knee.visibility },
-      ankle: { x: best.ankle.x, y: best.ankle.y, visibility: best.ankle.visibility },
+      shoulder: { x: best.shoulder.x, y: best.shoulder.y, visibility: best.shoulder.visibility },
+      hip:      { x: best.hip.x,   y: best.hip.y,   visibility: best.hip.visibility },
+      knee:     { x: best.knee.x,  y: best.knee.y,  visibility: best.knee.visibility },
+      ankle:    { x: best.ankle.x, y: best.ankle.y, visibility: best.ankle.visibility },
     },
   });
 }

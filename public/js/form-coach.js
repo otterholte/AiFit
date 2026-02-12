@@ -26,8 +26,8 @@ class FormCoach {
 
     // ---- Thresholds ----
     this.DEPTH_ANGLE_OK       = options.depthAngle       || 100;  // must reach ≤ this
-    this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 0.12; // hip-ankle x offset (normalised)
-    this.VALGUS_RATIO_LIMIT   = options.valgusRatioLimit  || 0.70; // kneeWidth / hipWidth < this = caving
+    this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 0.08; // shoulder-hip x offset (normalised) — ~8% of frame
+    this.VALGUS_RATIO_LIMIT   = options.valgusRatioLimit  || 0.85; // kneeWidth / hipWidth < this = caving
     this.MIN_HOLD_MS          = options.minHoldMs         || 400;  // ms at depth
 
     // ---- Issue definitions ----
@@ -35,30 +35,33 @@ class FormCoach {
       shallowDepth: {
         label: 'shallowDepth',
         test: (rep) => rep.minKneeAngle !== null && rep.minKneeAngle > this.DEPTH_ANGLE_OK,
-        correction: 'Try to go a little deeper',
+        correction: 'Try going a bit deeper — aim to get your thighs parallel',
         cleared: 'Great depth!',
-        // landmark indices to highlight (knee + ankle on both sides)
+        // landmark indices to highlight (knees + ankles both sides)
         highlights: [25, 26, 27, 28],
       },
       kneeValgus: {
         label: 'kneeValgus',
         test: (rep) => rep.kneeValgusRatio !== null && rep.kneeValgusRatio < this.VALGUS_RATIO_LIMIT,
-        correction: 'Push your knees out over your toes',
+        correction: 'Knees are caving in — push them out over your toes',
         cleared: 'Knees looking great!',
         highlights: [25, 26],
       },
       forwardLean: {
         label: 'forwardLean',
-        test: (rep) => rep.maxForwardLean !== null && rep.maxForwardLean > this.FORWARD_LEAN_LIMIT,
-        correction: 'Keep your chest up',
+        test: (rep) => rep.maxForwardLean > this.FORWARD_LEAN_LIMIT,
+        correction: 'Leaning too far forward — keep your chest up and back straight',
         cleared: 'Nice upright posture!',
         highlights: [11, 12, 23, 24], // shoulders + hips
       },
       shortHold: {
         label: 'shortHold',
-        test: (rep) => rep.holdMs !== null && rep.holdMs < this.MIN_HOLD_MS,
-        correction: 'Try holding at the bottom a little longer',
-        cleared: 'Good hold!',
+        // Only check hold time when the person actually reached depth (minKneeAngle ≤ target)
+        test: (rep) => rep.minKneeAngle !== null &&
+                       rep.minKneeAngle <= this.DEPTH_ANGLE_OK &&
+                       rep.holdMs < this.MIN_HOLD_MS,
+        correction: 'Hold the bottom position a beat longer — pause for a full second',
+        cleared: 'Nice hold!',
         highlights: [23, 24, 25, 26], // hips + knees
       },
     };
