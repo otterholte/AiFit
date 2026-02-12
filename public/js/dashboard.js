@@ -77,12 +77,40 @@ const sideFeedImg      = document.getElementById('side-feed');
 const sidePlaceholder  = document.getElementById('side-placeholder');
 
 // ==========================================================================
+// ROOM CODE — multi-user isolation
+// ==========================================================================
+// Room code comes from URL (?room=XXXX) or we create one
+const urlParams = new URLSearchParams(window.location.search);
+let roomCode = urlParams.get('room');
+
+async function ensureRoom() {
+  if (!roomCode) {
+    try {
+      const resp = await fetch('/api/create-room');
+      const data = await resp.json();
+      roomCode = data.room;
+    } catch (_) {
+      // Fallback: generate client-side
+      roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+    }
+    // Put room code in URL so refresh keeps the same room
+    const url = new URL(window.location);
+    url.searchParams.set('room', roomCode);
+    window.history.replaceState({}, '', url);
+  }
+}
+
+// ==========================================================================
 // Socket.IO (graceful — works without a server on GitHub Pages)
 // ==========================================================================
 const noop = () => {};
 const noopSocket = { emit: noop, on: noop, off: noop, connect: noop, disconnect: noop };
 const socket = (typeof window.io === 'function') ? window.io() : noopSocket;
-try { socket.emit('register', 'dashboard'); } catch (_) { /* no server */ }
+
+// Join room once we have a code (called after ensureRoom)
+function joinRoom() {
+  try { socket.emit('join-room', { room: roomCode, role: 'dashboard' }); } catch (_) { /* no server */ }
+}
 
 // ==========================================================================
 // State
@@ -1002,46 +1030,21 @@ document.querySelectorAll('.end-btn.selectable').forEach((btn) => {
 });
 
 // ==========================================================================
-// 16. QR CODE FOR PHONE CAMERA
+// 16. QR CODE FOR PHONE CAMERA (room-aware)
 // ==========================================================================
 const qrBox  = document.getElementById('qr-box');
 const qrNote = document.getElementById('qr-note');
+const roomCodeEl = document.getElementById('room-code');
 
-async function generateMenuQR() {
-  if (!qrBox || (typeof qrcodegen === 'undefined' && typeof qrcode === 'undefined')) return;
+function generateMenuQR() {
+  if (!qrBox || typeof qrcode === 'undefined' || !roomCode) return;
 
-  let sideUrl;
+  // Build the side-camera URL using the current origin + room code
   const loc = window.location;
-  const isLocal = loc.hostname === 'localhost' || loc.hostname === '127.0.0.1' || /^\d+\.\d+\.\d+\.\d+$/.test(loc.hostname);
+  const sideUrl = `${loc.protocol}//${loc.host}/side?room=${roomCode}`;
 
-  if (isLocal) {
-    // Running locally via node server.js — try to get LAN IP from server
-    try {
-      const resp = await fetch('/api/lan-ip');
-      const data = await resp.json();
-      if (data.ip) {
-        sideUrl = `https://${data.ip}:${data.port}/side.html`;
-      } else {
-        // Fallback: use current host (works if user already accessed via LAN IP)
-        const basePath = loc.pathname.replace(/\/[^/]*$/, '/');
-        sideUrl = loc.protocol + '//' + loc.host + basePath + 'side.html';
-      }
-    } catch (_) {
-      // API not available — use current host
-      const basePath = loc.pathname.replace(/\/[^/]*$/, '/');
-      sideUrl = loc.protocol + '//' + loc.host + basePath + 'side.html';
-    }
-  } else {
-    // GitHub Pages or other static hosting — side camera won't relay data
-    // Still show QR but add a note about needing local server
-    const basePath = loc.pathname.replace(/\/[^/]*$/, '/');
-    sideUrl = loc.protocol + '//' + loc.host + basePath + 'side.html';
-
-    if (qrNote) {
-      qrNote.innerHTML = '⚠️ Side camera needs local server<br><code>node server.js</code> for live tracking';
-      qrNote.style.color = '#fdcb6e';
-    }
-  }
+  // Show the room code on screen
+  if (roomCodeEl) roomCodeEl.textContent = roomCode;
 
   try {
     const qr = qrcode(0, 'M');
@@ -1062,9 +1065,13 @@ async function generateMenuQR() {
     qrBox.style.display = 'none';
   }
 }
-generateMenuQR();
 
 // ==========================================================================
-// GO
+// GO — ensure room is created, then init everything
 // ==========================================================================
-initFrontCamera();
+(async () => {
+  await ensureRoom();
+  joinRoom();
+  generateMenuQR();
+  initFrontCamera();
+})();

@@ -22,6 +22,10 @@ import {
 const source = window.location.pathname.includes('side') ? 'side' : 'front';
 const isSide = source === 'side';
 
+// Room code from URL (e.g. /side?room=A3F9)
+const urlParams = new URLSearchParams(window.location.search);
+const roomCode = urlParams.get('room');
+
 // ---------------------------------------------------------------
 // DOM
 // ---------------------------------------------------------------
@@ -78,12 +82,15 @@ let socket;
 
 try {
   socket = (typeof window.io === 'function') ? window.io() : _noopSocket;
-  socket.emit('register', source);
 
   // Track connection state
   if (socket !== _noopSocket) {
     socket.on('connect', () => {
       socketConnected = true;
+      // Join the room once connected (and on every reconnect)
+      if (roomCode) {
+        socket.emit('join-room', { room: roomCode, role: source });
+      }
       if (statusDot) statusDot.classList.remove('offline');
       if (noServerMsg) noServerMsg.classList.add('hidden');
       updateStatus('Connected to dashboard');

@@ -548,9 +548,20 @@ body {
 }
 .qr-box { line-height: 0; }
 .qr-box img, .qr-box canvas { border-radius: 4px; }
+.qr-info {
+  display: flex; flex-direction: column; gap: 6px;
+}
 .qr-label {
   font-size: 0.75rem; color: var(--text-dim);
   max-width: 180px; line-height: 1.5;
+}
+.qr-room {
+  font-size: 0.8rem; color: var(--text-dim);
+  letter-spacing: 1px;
+}
+.qr-room strong {
+  color: var(--purple); font-size: 1.1rem;
+  font-family: monospace; letter-spacing: 2px;
 }
 
 /* ---- Menu grid ---- */
