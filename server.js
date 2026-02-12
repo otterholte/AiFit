@@ -29,6 +29,24 @@ try {
 // 1. Express app — serves static files from /public
 // ---------------------------------------------------------------------------
 const app = express();
+
+// Prevent browser from caching JS/CSS — always serve fresh code after deploys
+app.use('/js', express.static(path.join(__dirname, 'public', 'js'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+  },
+}));
+app.use('/css', express.static(path.join(__dirname, 'public', 'css'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.set('Pragma', 'no-cache');
+  },
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check for Railway

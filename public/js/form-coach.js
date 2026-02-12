@@ -26,7 +26,7 @@ class FormCoach {
 
     // ---- Thresholds ----
     this.DEPTH_ANGLE_OK       = options.depthAngle       || 95;   // must reach ≤ 95° (thighs near parallel)
-    this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 35;   // torso angle from vertical in degrees
+    this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 45;   // torso angle from vertical in degrees (normal squat is ~25-35°)
     this.VALGUS_RATIO_LIMIT   = options.valgusRatioLimit  || 0.85; // kneeWidth / hipWidth < this = caving
     this.MIN_HOLD_MS          = options.minHoldMs         || 400;  // ms at depth
 

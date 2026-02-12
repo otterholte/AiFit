@@ -124,6 +124,8 @@ let sideLastSeen  = 0;
 let timerStart    = 0;
 let timerInterval = null;
 let lastState     = 'UP';
+let _lastLeanLog  = 0;
+let _warnedNoShoulder = false;
 let isPaused      = false;
 let workoutDone   = false;
 
@@ -422,6 +424,17 @@ socket.on('pose-update', (data) => {
         const dy = Math.abs(hip.y - shoulder.y);  // hip.y > shoulder.y (y goes downward)
         const leanDeg = dy > 0.01 ? Math.atan2(dx, dy) * (180 / Math.PI) : 0;
         if (leanDeg > repMaxForwardLean) repMaxForwardLean = leanDeg;
+        // Throttled debug (every ~2s)
+        if (Date.now() - _lastLeanLog > 2000) {
+          _lastLeanLog = Date.now();
+          console.log(`[lean] shoulder=(${shoulder.x.toFixed(3)},${shoulder.y.toFixed(3)}) hip=(${hip.x.toFixed(3)},${hip.y.toFixed(3)}) angle=${leanDeg.toFixed(1)}° max=${repMaxForwardLean.toFixed(1)}° kneeAngle=${kneeAngle}`);
+        }
+      } else if (!shoulder) {
+        // Side camera may not be sending shoulder data (old cached code)
+        if (!_warnedNoShoulder) {
+          console.warn('[lean] No shoulder data from side camera — phone may be running cached code. Reload the phone page.');
+          _warnedNoShoulder = true;
+        }
       }
     }
     // Hold time accumulation (only when at depth)
@@ -538,11 +551,11 @@ function updateCoaching(result, setReps) {
       // ---- Form Coach: evaluate this rep ----
       const repMetrics = {
         minKneeAngle:    repMinKneeAngle,
-        maxForwardLean:  repMaxForwardLean,
-        kneeValgusRatio: repKneeValgusRatio,
+        maxForwardLean:  Math.round(repMaxForwardLean * 10) / 10,
+        kneeValgusRatio: repKneeValgusRatio !== null ? Math.round(repKneeValgusRatio * 100) / 100 : null,
         holdMs:          repHoldMs,
       };
-      console.log('[FormCoach] Rep metrics:', repMetrics);
+      console.log('[FormCoach] Rep metrics:', JSON.stringify(repMetrics));
       const coachResult = formCoach.recordRep(repMetrics);
       if (coachResult.correction) {
         console.log('[FormCoach] Correction:', coachResult.correction, '| Watch:', [...coachResult.watchIssues]);
