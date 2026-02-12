@@ -153,12 +153,17 @@ const formCoach = new FormCoach();
 
 // Per-rep metric accumulators (reset each rep)
 let repMinKneeAngle   = null;   // lowest knee angle during this rep
-let repMaxForwardLean  = 0;     // max hip-ankle x offset (normalised)
+let repMaxForwardLean  = 0;     // max torso lean angle in degrees
 let repHoldMs          = 0;     // ms spent at depth (≤ target angle)
-let repKneeValgusRatio = null;  // kneeWidth / hipWidth from front cam (sampled at deepest point)
+let repKneeValgusRatio = null;  // kneeWidth / hipWidth from front cam
+let repStartAnkleY    = null;   // ankle Y at start of rep (for heel rise)
+let repMaxHeelRise    = 0;      // max upward ankle displacement during rep
+let repMaxHipShift    = 0;      // max lateral hip shift during rep (front cam)
 
-// Front camera valgus sampling
+// Front camera sampling
 let latestFrontValgusRatio = null;  // updated each front-cam frame
+let latestFrontHipMidX     = null;  // hip midpoint X from front cam
+let repStartHipMidX        = null;  // hip midpoint X at start of rep
 
 // Hand gesture state
 let handRaisedSince  = 0;
@@ -262,7 +267,7 @@ function frontDetectLoop() {
       drawSkeleton(frontCtx, frontCanvas.width, frontCanvas.height, lm);
     }
 
-    // Sample knee valgus from front camera (only during workout)
+    // Sample knee valgus + hip shift from front camera (only during workout)
     if (!menuActive && !endScreenActive && !isPaused && !workoutDone) {
       const lk = lm[LM.LEFT_KNEE], rk = lm[LM.RIGHT_KNEE];
       const lh = lm[LM.LEFT_HIP],  rh = lm[LM.RIGHT_HIP];
@@ -273,6 +278,8 @@ function frontDetectLoop() {
         if (hipWidth > 0.01) {
           latestFrontValgusRatio = kneeWidth / hipWidth;
         }
+        // Track hip midpoint X for lateral shift detection
+        latestFrontHipMidX = (lh.x + rh.x) / 2;
       }
     }
 
@@ -443,6 +450,21 @@ socket.on('pose-update', (data) => {
         }
       }
 
+      // Heel rise: track ankle Y moving upward from start of rep
+      const ankle = data.landmarks.ankle;
+      if (ankle && ankle.visibility > 0.3) {
+        if (repStartAnkleY === null) repStartAnkleY = ankle.y;
+        const rise = repStartAnkleY - ankle.y;  // positive = ankle moved up
+        if (rise > repMaxHeelRise) repMaxHeelRise = rise;
+      }
+
+      // Hip shift: track lateral movement from front camera
+      if (latestFrontHipMidX !== null) {
+        if (repStartHipMidX === null) repStartHipMidX = latestFrontHipMidX;
+        const shift = Math.abs(latestFrontHipMidX - repStartHipMidX);
+        if (shift > repMaxHipShift) repMaxHipShift = shift;
+      }
+
       _liveKneeAngle = kneeAngle;
       _liveLeanDeg = (shoulder && hip && shoulder.visibility > 0.3)
         ? Math.atan2(Math.abs(shoulder.x - hip.x) * sideAR, Math.abs(hip.y - shoulder.y)) * (180 / Math.PI)
@@ -566,6 +588,8 @@ function updateCoaching(result, setReps) {
         maxForwardLean:  Math.round(repMaxForwardLean * 10) / 10,
         kneeValgusRatio: repKneeValgusRatio !== null ? Math.round(repKneeValgusRatio * 100) / 100 : null,
         holdMs:          repHoldMs,
+        heelRise:        Math.round(repMaxHeelRise * 1000) / 1000,
+        hipShift:        Math.round(repMaxHipShift * 1000) / 1000,
       };
       console.log('[FormCoach] Rep metrics:', JSON.stringify(repMetrics));
       const coachResult = formCoach.recordRep(repMetrics);
@@ -580,6 +604,10 @@ function updateCoaching(result, setReps) {
       repMaxForwardLean  = 0;
       repHoldMs          = 0;
       repKneeValgusRatio = null;
+      repStartAnkleY     = null;
+      repMaxHeelRise     = 0;
+      repMaxHipShift     = 0;
+      repStartHipMidX    = null;
 
       // Handle cleared issues (positive reinforcement)
       if (coachResult.clearedIssues.length > 0) {
@@ -734,6 +762,7 @@ resetBtn.addEventListener('click', () => {
   reachedDepthTime   = 0;
   lastDepthPhase     = '';
   repMinKneeAngle = null; repMaxForwardLean = 0; repHoldMs = 0; repKneeValgusRatio = null;
+  repStartAnkleY = null; repMaxHeelRise = 0; repMaxHipShift = 0; repStartHipMidX = null;
   repCountEl.textContent = '0';
   feedbackEl.textContent = '';
   feedbackEl.style.opacity = '0';
@@ -770,10 +799,11 @@ function updateDebugOverlay(kneeAngle, leanDeg, ar) {
   const streaks = formCoach._state;
   const lines = [
     `Knee: ${kneeAngle !== null ? kneeAngle + '°' : '--'}  (down<115° good<95°)`,
-    `Lean: ${leanDeg !== null ? leanDeg.toFixed(1) + '°' : '--'}  (warn>45°)`,
+    `Lean: ${leanDeg !== null ? leanDeg.toFixed(1) + '°' : '--'}  (warn>55°)`,
     `AR: ${ar.toFixed(2)}  MinKnee: ${repMinKneeAngle ?? '--'}°  MaxLean: ${repMaxForwardLean.toFixed(1)}°`,
     `Hold: ${repHoldMs}ms  Valgus: ${repKneeValgusRatio !== null ? repKneeValgusRatio.toFixed(2) : '--'}`,
-    `Streaks: depth=${streaks.shallowDepth.badStreak} lean=${streaks.forwardLean.badStreak} valgus=${streaks.kneeValgus.badStreak} hold=${streaks.shortHold.badStreak}`,
+    `HeelRise: ${(repMaxHeelRise * 100).toFixed(1)}%  HipShift: ${(repMaxHipShift * 100).toFixed(1)}%`,
+    `Streaks: depth=${streaks.shallowDepth?.badStreak||0} lean=${streaks.forwardLean?.badStreak||0} valgus=${streaks.kneeValgus?.badStreak||0} heel=${streaks.heelRise?.badStreak||0} hip=${streaks.hipShift?.badStreak||0} hold=${streaks.shortHold?.badStreak||0}`,
     `Watch: ${[...formCoach.getWatchIssues()].join(', ') || 'none'}`,
   ];
   debugOverlay.innerHTML = lines.join('<br>');
@@ -1075,6 +1105,7 @@ function selectWorkout(workoutId) {
   reachedDepthTime   = 0;
   lastDepthPhase     = '';
   repMinKneeAngle = null; repMaxForwardLean = 0; repHoldMs = 0; repKneeValgusRatio = null;
+  repStartAnkleY = null; repMaxHeelRise = 0; repMaxHipShift = 0; repStartHipMidX = null;
   repCountEl.textContent = '0';
   feedbackEl.textContent = '';
   feedbackEl.style.opacity = '0';

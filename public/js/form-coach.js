@@ -25,10 +25,12 @@ class FormCoach {
     this.CLEAN_TO_CLEAR  = options.cleanToClear  || 2;
 
     // ---- Thresholds ----
-    this.DEPTH_ANGLE_OK       = options.depthAngle       || 95;   // must reach ≤ 95° (thighs near parallel)
-    this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 45;   // torso angle from vertical in degrees (normal squat is ~25-35°)
-    this.VALGUS_RATIO_LIMIT   = options.valgusRatioLimit  || 0.85; // kneeWidth / hipWidth < this = caving
-    this.MIN_HOLD_MS          = options.minHoldMs         || 400;  // ms at depth
+    this.DEPTH_ANGLE_OK       = options.depthAngle       || 95;    // must reach ≤ 95° (thighs near parallel)
+    this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 55;    // torso angle from vertical (normal squat 30-50°, flag only severe)
+    this.VALGUS_RATIO_LIMIT   = options.valgusRatioLimit  || 0.85;  // kneeWidth / hipWidth < this = caving
+    this.MIN_HOLD_MS          = options.minHoldMs         || 400;   // ms at depth
+    this.HEEL_RISE_LIMIT      = options.heelRiseLimit     || 0.025; // normalised ankle-Y rise (side cam)
+    this.HIP_SHIFT_LIMIT      = options.hipShiftLimit     || 0.04;  // normalised lateral hip drift (front cam)
 
     // ---- Issue definitions ----
     this.ISSUES = {
@@ -37,15 +39,14 @@ class FormCoach {
         test: (rep) => rep.minKneeAngle !== null && rep.minKneeAngle > this.DEPTH_ANGLE_OK,
         correction: 'Try going a bit deeper — aim to get your thighs parallel',
         cleared: 'Great depth!',
-        // landmark indices to highlight (knees + ankles both sides)
-        highlights: [25, 26, 27, 28],
+        highlights: [25, 26, 27, 28], // knees + ankles
       },
       kneeValgus: {
         label: 'kneeValgus',
         test: (rep) => rep.kneeValgusRatio !== null && rep.kneeValgusRatio < this.VALGUS_RATIO_LIMIT,
         correction: 'Knees are caving in — push them out over your toes',
         cleared: 'Knees looking great!',
-        highlights: [25, 26],
+        highlights: [25, 26], // knees
       },
       forwardLean: {
         label: 'forwardLean',
@@ -54,9 +55,23 @@ class FormCoach {
         cleared: 'Nice upright posture!',
         highlights: [11, 12, 23, 24], // shoulders + hips
       },
+      heelRise: {
+        label: 'heelRise',
+        test: (rep) => rep.heelRise > this.HEEL_RISE_LIMIT,
+        correction: 'Heels are lifting — press through your whole foot, especially the heels',
+        cleared: 'Feet are solid!',
+        highlights: [27, 28], // ankles
+      },
+      hipShift: {
+        label: 'hipShift',
+        test: (rep) => rep.hipShift > this.HIP_SHIFT_LIMIT,
+        correction: 'You\'re shifting to one side — try to keep your weight centered',
+        cleared: 'Nice and balanced!',
+        highlights: [23, 24], // hips
+      },
       shortHold: {
         label: 'shortHold',
-        // Only check hold time when the person actually reached depth (minKneeAngle ≤ target)
+        // Only check hold time when the person actually reached depth
         test: (rep) => rep.minKneeAngle !== null &&
                        rep.minKneeAngle <= this.DEPTH_ANGLE_OK &&
                        rep.holdMs < this.MIN_HOLD_MS,
