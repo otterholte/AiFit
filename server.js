@@ -1,18 +1,38 @@
+// Catch any crash before it disappears into the void
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[FATAL] Unhandled rejection:', err);
+  process.exit(1);
+});
+
 console.log('[boot] Starting AI FIT server...');
+console.log('[boot] Node version:', process.version);
+console.log('[boot] PORT env:', process.env.PORT);
 
-const http = require('http');
-const express = require('express');
-const { Server } = require('socket.io');
-const crypto = require('crypto');
-const path = require('path');
-
-console.log('[boot] All modules loaded OK');
+let http, express, Server, crypto, path;
+try {
+  http = require('http');
+  express = require('express');
+  Server = require('socket.io').Server;
+  crypto = require('crypto');
+  path = require('path');
+  console.log('[boot] All modules loaded OK');
+} catch (err) {
+  console.error('[FATAL] Module load failed:', err);
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // 1. Express app — serves static files from /public
 // ---------------------------------------------------------------------------
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check for Railway
+app.get('/health', (_req, res) => res.send('OK'));
 
 // Routes
 app.get('/',          (_req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
@@ -41,25 +61,20 @@ const io = new Server(server, {
 io.on('connection', (socket) => {
   console.log(`[connect]    ${socket.id}`);
 
-  // Client joins a room (both dashboard and phone call this)
   socket.on('join-room', ({ room, role }) => {
     socket.data.room = room;
     socket.data.role = role;
     socket.join(room);
     console.log(`[join-room]  ${socket.id} → room=${room} role=${role}`);
-
-    // Notify others in the room that this role connected
     socket.to(room).emit('client-status', { source: role, connected: true });
   });
 
-  // Pose landmarks — relay to same room only
   socket.on('pose-data', (data) => {
     if (socket.data.room) {
       socket.to(socket.data.room).emit('pose-update', data);
     }
   });
 
-  // Camera frame snapshots — relay to same room only
   socket.on('frame-data', (data) => {
     if (socket.data.room) {
       socket.to(socket.data.room).emit('frame-update', data);
@@ -86,7 +101,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('  AI FIT — Server Running');
   console.log('==========================================');
   console.log(`  Port: ${PORT}`);
-  console.log(`  http://localhost:${PORT}/dashboard`);
   console.log('==========================================');
   console.log('');
 });
