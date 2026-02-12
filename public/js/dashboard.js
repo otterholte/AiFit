@@ -70,6 +70,7 @@ const frontDot         = document.getElementById('front-dot');
 const sideDot          = document.getElementById('side-dot');
 const correctionBanner     = document.getElementById('correction-banner');
 const correctionBannerText = document.getElementById('correction-banner-text');
+const debugOverlay         = document.getElementById('debug-overlay');
 
 const frontVideo       = document.getElementById('front-webcam');
 const frontCanvas      = document.getElementById('front-overlay');
@@ -126,6 +127,10 @@ let timerInterval = null;
 let lastState     = 'UP';
 let _lastLeanLog  = 0;
 let _warnedNoShoulder = false;
+let _debugEnabled = false;   // toggle with Ctrl+D in browser
+let _lastDebugUpdate = 0;
+let _liveKneeAngle = null;
+let _liveLeanDeg = null;
 let isPaused      = false;
 let workoutDone   = false;
 
@@ -392,7 +397,8 @@ socket.on('pose-update', (data) => {
 
   if (!timerStart) startTimer();
 
-  const result = squat.update(data.landmarks, data.poseValid !== false);
+  const sideAR = data.aspectRatio || 1;  // video width/height from phone camera
+  const result = squat.update(data.landmarks, data.poseValid !== false, sideAR);
 
   // Update rep count (relative to current set)
   const setReps = result.repCount - (currentSet - 1) * REPS_PER_SET;
@@ -416,32 +422,38 @@ socket.on('pose-update', (data) => {
         }
       }
 
-      // Forward lean: torso angle from vertical in degrees (0 = upright, 45 = severe lean)
+      // Forward lean: torso angle from vertical in degrees (0 = upright, 45+ = severe lean)
+      // Corrected for video aspect ratio to avoid portrait-mode distortion
       const shoulder = data.landmarks.shoulder;
       const hip = data.landmarks.hip;
       if (shoulder && hip && shoulder.visibility > 0.3) {
-        const dx = Math.abs(shoulder.x - hip.x);
-        const dy = Math.abs(hip.y - shoulder.y);  // hip.y > shoulder.y (y goes downward)
+        const dx = Math.abs(shoulder.x - hip.x) * sideAR;  // correct for aspect ratio
+        const dy = Math.abs(hip.y - shoulder.y);
         const leanDeg = dy > 0.01 ? Math.atan2(dx, dy) * (180 / Math.PI) : 0;
         if (leanDeg > repMaxForwardLean) repMaxForwardLean = leanDeg;
         // Throttled debug (every ~2s)
         if (Date.now() - _lastLeanLog > 2000) {
           _lastLeanLog = Date.now();
-          console.log(`[lean] shoulder=(${shoulder.x.toFixed(3)},${shoulder.y.toFixed(3)}) hip=(${hip.x.toFixed(3)},${hip.y.toFixed(3)}) angle=${leanDeg.toFixed(1)}° max=${repMaxForwardLean.toFixed(1)}° kneeAngle=${kneeAngle}`);
+          console.log(`[debug] AR=${sideAR.toFixed(2)} kneeAngle=${kneeAngle}° lean=${leanDeg.toFixed(1)}° maxLean=${repMaxForwardLean.toFixed(1)}° minKnee=${repMinKneeAngle}°`);
         }
       } else if (!shoulder) {
-        // Side camera may not be sending shoulder data (old cached code)
         if (!_warnedNoShoulder) {
-          console.warn('[lean] No shoulder data from side camera — phone may be running cached code. Reload the phone page.');
+          console.warn('[lean] No shoulder data — phone may be running cached code. Reload phone page.');
           _warnedNoShoulder = true;
         }
       }
+
+      _liveKneeAngle = kneeAngle;
+      _liveLeanDeg = (shoulder && hip && shoulder.visibility > 0.3)
+        ? Math.atan2(Math.abs(shoulder.x - hip.x) * sideAR, Math.abs(hip.y - shoulder.y)) * (180 / Math.PI)
+        : null;
     }
     // Hold time accumulation (only when at depth)
     if (reachedTargetDepth && kneeAngle !== null && kneeAngle <= TARGET_DEPTH_ANGLE) {
       repHoldMs += 33; // ~33ms per frame at 30fps
     }
 
+    updateDebugOverlay(_liveKneeAngle, _liveLeanDeg, sideAR);
     updateCoaching(result, setReps);
 
     // Check set completion
@@ -739,6 +751,33 @@ resetBtn.addEventListener('click', () => {
 setInterval(() => {
   if (sideLastSeen > 0 && Date.now() - sideLastSeen > 3000) sideDot.classList.remove('live');
 }, 1000);
+
+// ==========================================================================
+// DEBUG OVERLAY — toggle with Ctrl+D
+// ==========================================================================
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'd') {
+    e.preventDefault();
+    _debugEnabled = !_debugEnabled;
+    if (debugOverlay) debugOverlay.style.display = _debugEnabled ? 'block' : 'none';
+  }
+});
+
+function updateDebugOverlay(kneeAngle, leanDeg, ar) {
+  if (!_debugEnabled || !debugOverlay) return;
+  if (Date.now() - _lastDebugUpdate < 200) return; // throttle to 5fps
+  _lastDebugUpdate = Date.now();
+  const streaks = formCoach._state;
+  const lines = [
+    `Knee: ${kneeAngle !== null ? kneeAngle + '°' : '--'}  (down<115° good<95°)`,
+    `Lean: ${leanDeg !== null ? leanDeg.toFixed(1) + '°' : '--'}  (warn>45°)`,
+    `AR: ${ar.toFixed(2)}  MinKnee: ${repMinKneeAngle ?? '--'}°  MaxLean: ${repMaxForwardLean.toFixed(1)}°`,
+    `Hold: ${repHoldMs}ms  Valgus: ${repKneeValgusRatio !== null ? repKneeValgusRatio.toFixed(2) : '--'}`,
+    `Streaks: depth=${streaks.shallowDepth.badStreak} lean=${streaks.forwardLean.badStreak} valgus=${streaks.kneeValgus.badStreak} hold=${streaks.shortHold.badStreak}`,
+    `Watch: ${[...formCoach.getWatchIssues()].join(', ') || 'none'}`,
+  ];
+  debugOverlay.innerHTML = lines.join('<br>');
+}
 
 // ==========================================================================
 // 8. CELEBRATIONS & SOUNDS

@@ -422,10 +422,13 @@ function pickBestSide(landmarks) {
 function sendLandmarks(landmarks, poseValid) {
   if (!socketConnected) return;  // skip if no server
   const best = pickBestSide(landmarks);
+  // Send aspect ratio so the dashboard can correct for portrait/landscape distortion
+  const ar = video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 1;
   socket.emit('pose-data', {
     source,
     timestamp: Date.now(),
     poseValid,
+    aspectRatio: ar,
     landmarks: {
       shoulder: { x: best.shoulder.x, y: best.shoulder.y, visibility: best.shoulder.visibility },
       hip:      { x: best.hip.x,   y: best.hip.y,   visibility: best.hip.visibility },

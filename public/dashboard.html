@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI FIT — Dashboard</title>
-  <link rel="stylesheet" href="css/dashboard.css?v=3" />
+  <link rel="stylesheet" href="css/dashboard.css?v=4" />
 </head>
 <body>
   <!-- ============================================================
@@ -245,6 +245,14 @@
     <span id="correction-banner-text"></span>
   </div>
 
+  <!-- Debug overlay (small corner display of real-time values) -->
+  <div id="debug-overlay" style="
+    position:fixed; bottom:80px; left:12px; z-index:500;
+    background:rgba(0,0,0,0.7); color:#0f0; font-family:monospace; font-size:11px;
+    padding:6px 10px; border-radius:6px; pointer-events:none; display:none;
+    line-height:1.5;
+  "></div>
+
   <!-- Tracking warning -->
   <div id="tracking-warning" class="tracking-overlay" style="display:none;">
     Adjust your position — body not fully visible
@@ -312,8 +320,8 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <!-- QR code generator -->
   <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-  <script src="js/squat-detector.js?v=3"></script>
-  <script src="js/form-coach.js?v=3"></script>
-  <script type="module" src="js/dashboard.js?v=3"></script>
+  <script src="js/squat-detector.js?v=4"></script>
+  <script src="js/form-coach.js?v=4"></script>
+  <script type="module" src="js/dashboard.js?v=4"></script>
 </body>
 </html>

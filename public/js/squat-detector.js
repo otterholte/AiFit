@@ -21,8 +21,16 @@ class SquatDetector {
     this._trackingLostSince = 0;
   }
 
-  static angle(a, b, c) {
-    const rad = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+  /**
+   * Compute the angle at point b (vertex) between segments b→a and b→c.
+   * @param {Object} a  { x, y }
+   * @param {Object} b  { x, y }  — the vertex
+   * @param {Object} c  { x, y }
+   * @param {number} ar — aspect ratio (width/height) to correct for non-square pixels
+   */
+  static angle(a, b, c, ar = 1) {
+    const rad = Math.atan2(c.y - b.y, (c.x - b.x) * ar)
+              - Math.atan2(a.y - b.y, (a.x - b.x) * ar);
     let deg = Math.abs(rad * (180 / Math.PI));
     if (deg > 180) deg = 360 - deg;
     return deg;
@@ -31,8 +39,9 @@ class SquatDetector {
   /**
    * @param {Object} landmarks  { hip, knee, ankle } each with x, y, visibility
    * @param {boolean} poseValid  external validation flag (false = not a real person)
+   * @param {number}  aspectRatio  video width/height (corrects for portrait phones)
    */
-  update(landmarks, poseValid = true) {
+  update(landmarks, poseValid = true, aspectRatio = 1) {
     const now = Date.now();
     const { hip, knee, ankle } = landmarks;
 
@@ -54,7 +63,7 @@ class SquatDetector {
     }
 
     this._trackingLostSince = 0;
-    const kneeAngle = SquatDetector.angle(hip, knee, ankle);
+    const kneeAngle = SquatDetector.angle(hip, knee, ankle, aspectRatio);
 
     // ---- State transitions ----
     if (this.state === 'UP') {
