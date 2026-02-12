@@ -269,16 +269,24 @@ function frontDetectLoop() {
 
     // Sample knee valgus + hip shift from front camera (only during workout)
     if (!menuActive && !endScreenActive && !isPaused && !workoutDone) {
-      const lk = lm[LM.LEFT_KNEE], rk = lm[LM.RIGHT_KNEE];
-      const lh = lm[LM.LEFT_HIP],  rh = lm[LM.RIGHT_HIP];
-      if (lk.visibility > 0.4 && rk.visibility > 0.4 &&
-          lh.visibility > 0.4 && rh.visibility > 0.4) {
-        const kneeWidth = Math.abs(lk.x - rk.x);
-        const hipWidth  = Math.abs(lh.x - rh.x);
-        if (hipWidth > 0.01) {
-          latestFrontValgusRatio = kneeWidth / hipWidth;
+      const lk = lm[LM.LEFT_KNEE],  rk = lm[LM.RIGHT_KNEE];
+      const lh = lm[LM.LEFT_HIP],   rh = lm[LM.RIGHT_HIP];
+      const la = lm[LM.LEFT_ANKLE],  ra = lm[LM.RIGHT_ANKLE];
+
+      // Knee valgus: compare knee width to ANKLE width (not hip width)
+      // A trainer checks if knees track over ankles/toes — this is the direct measurement
+      if (lk.visibility > 0.3 && rk.visibility > 0.3 &&
+          la.visibility > 0.3 && ra.visibility > 0.3) {
+        const kneeWidth  = Math.abs(lk.x - rk.x);
+        const ankleWidth = Math.abs(la.x - ra.x);
+        if (ankleWidth > 0.01) {
+          // Ratio < 1.0 means knees are closer together than ankles = caving in
+          latestFrontValgusRatio = kneeWidth / ankleWidth;
         }
-        // Track hip midpoint X for lateral shift detection
+      }
+
+      // Hip shift: track lateral movement
+      if (lh.visibility > 0.3 && rh.visibility > 0.3) {
         latestFrontHipMidX = (lh.x + rh.x) / 2;
       }
     }
@@ -801,7 +809,7 @@ function updateDebugOverlay(kneeAngle, leanDeg, ar) {
     `Knee: ${kneeAngle !== null ? kneeAngle + '°' : '--'}  (down<115° good<95°)`,
     `Lean: ${leanDeg !== null ? leanDeg.toFixed(1) + '°' : '--'}  (warn>55°)`,
     `AR: ${ar.toFixed(2)}  MinKnee: ${repMinKneeAngle ?? '--'}°  MaxLean: ${repMaxForwardLean.toFixed(1)}°`,
-    `Hold: ${repHoldMs}ms  Valgus: ${repKneeValgusRatio !== null ? repKneeValgusRatio.toFixed(2) : '--'}`,
+    `Hold: ${repHoldMs}ms  Valgus(knee/ankle): ${repKneeValgusRatio !== null ? repKneeValgusRatio.toFixed(2) : '--'} (warn<0.92)`,
     `HeelRise: ${(repMaxHeelRise * 100).toFixed(1)}%  HipShift: ${(repMaxHipShift * 100).toFixed(1)}%`,
     `Streaks: depth=${streaks.shallowDepth?.badStreak||0} lean=${streaks.forwardLean?.badStreak||0} valgus=${streaks.kneeValgus?.badStreak||0} heel=${streaks.heelRise?.badStreak||0} hip=${streaks.hipShift?.badStreak||0} hold=${streaks.shortHold?.badStreak||0}`,
     `Watch: ${[...formCoach.getWatchIssues()].join(', ') || 'none'}`,
