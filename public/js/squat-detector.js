@@ -7,8 +7,8 @@
 
 class SquatDetector {
   constructor(options = {}) {
-    this.downAngleThreshold = options.downAngle || 100;
-    this.upAngleThreshold   = options.upAngle   || 160;
+    this.downAngleThreshold = options.downAngle || 115;  // count half-squats too (so coach can correct them)
+    this.upAngleThreshold   = options.upAngle   || 155;
     this.minDownDuration    = options.minDownDuration || 150;
     this.minRepInterval     = options.minRepInterval  || 400;
     this.minConfidence      = options.minConfidence   || 0.3;

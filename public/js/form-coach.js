@@ -25,8 +25,8 @@ class FormCoach {
     this.CLEAN_TO_CLEAR  = options.cleanToClear  || 2;
 
     // ---- Thresholds ----
-    this.DEPTH_ANGLE_OK       = options.depthAngle       || 100;  // must reach ≤ this
-    this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 0.08; // shoulder-hip x offset (normalised) — ~8% of frame
+    this.DEPTH_ANGLE_OK       = options.depthAngle       || 95;   // must reach ≤ 95° (thighs near parallel)
+    this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 35;   // torso angle from vertical in degrees
     this.VALGUS_RATIO_LIMIT   = options.valgusRatioLimit  || 0.85; // kneeWidth / hipWidth < this = caving
     this.MIN_HOLD_MS          = options.minHoldMs         || 400;  // ms at depth
 
@@ -79,7 +79,7 @@ class FormCoach {
    *
    * @param {Object} rep
    * @param {number|null} rep.minKneeAngle  — lowest knee angle during the rep
-   * @param {number|null} rep.maxForwardLean — max hip-ankle x offset (normalised 0-1)
+   * @param {number}      rep.maxForwardLean — torso angle from vertical in degrees (0=upright)
    * @param {number|null} rep.kneeValgusRatio — kneeWidth / hipWidth at deepest point (from front cam)
    * @param {number|null} rep.holdMs         — ms spent at depth
    *
@@ -88,19 +88,21 @@ class FormCoach {
   recordRep(rep) {
     let correction = null;        // first new correction to surface (only one per rep)
     const clearedIssues = [];
+    const badThisRep = new Set();  // track which issues were bad this specific rep
 
     for (const [key, issue] of Object.entries(this.ISSUES)) {
       const s = this._state[key];
       const bad = issue.test(rep);
 
       if (bad) {
+        badThisRep.add(key);
         s.badStreak++;
         s.cleanStreak = 0;
 
-        // Trigger a correction once the streak hits the threshold
+        // Trigger a new correction once the streak hits the threshold
         if (s.badStreak >= this.STREAK_TO_WARN && !s.watching) {
           s.watching = true;
-          if (!correction) correction = issue.correction; // only show one correction at a time
+          if (!correction) correction = issue.correction;
         }
       } else {
         // Good rep for this issue
@@ -116,11 +118,11 @@ class FormCoach {
       }
     }
 
-    // If there's already a watched issue that hasn't been corrected yet,
-    // keep reminding (but only every few reps — the caller throttles display)
+    // Only re-show a watched correction if the issue is STILL bad this rep.
+    // Don't nag on clean reps — let the user feel the improvement.
     if (!correction) {
       for (const [key, issue] of Object.entries(this.ISSUES)) {
-        if (this._state[key].watching) {
+        if (this._state[key].watching && badThisRep.has(key)) {
           correction = issue.correction;
           break;
         }

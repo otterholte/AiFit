@@ -414,18 +414,14 @@ socket.on('pose-update', (data) => {
         }
       }
 
-      // Forward lean: use shoulder-to-hip horizontal offset (torso angle)
-      // Falls back to hip-to-ankle if shoulder data is missing
+      // Forward lean: torso angle from vertical in degrees (0 = upright, 45 = severe lean)
       const shoulder = data.landmarks.shoulder;
       const hip = data.landmarks.hip;
-      const ankle = data.landmarks.ankle;
       if (shoulder && hip && shoulder.visibility > 0.3) {
-        // Shoulder X forward of hip X = forward lean (direction-independent)
-        const lean = Math.abs(shoulder.x - hip.x);
-        if (lean > repMaxForwardLean) repMaxForwardLean = lean;
-      } else if (hip && ankle) {
-        const lean = Math.abs(hip.x - ankle.x);
-        if (lean > repMaxForwardLean) repMaxForwardLean = lean;
+        const dx = Math.abs(shoulder.x - hip.x);
+        const dy = Math.abs(hip.y - shoulder.y);  // hip.y > shoulder.y (y goes downward)
+        const leanDeg = dy > 0.01 ? Math.atan2(dx, dy) * (180 / Math.PI) : 0;
+        if (leanDeg > repMaxForwardLean) repMaxForwardLean = leanDeg;
       }
     }
     // Hold time accumulation (only when at depth)
