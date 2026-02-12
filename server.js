@@ -1,8 +1,12 @@
+console.log('[boot] Starting AI FIT server...');
+
 const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
 const path = require('path');
+
+console.log('[boot] All modules loaded OK');
 
 // ---------------------------------------------------------------------------
 // 1. Express app — serves static files from /public
