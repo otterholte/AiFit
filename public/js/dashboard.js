@@ -8,7 +8,7 @@
  *   - Throttled coaching cues, applause on set completion
  */
 
-/* global io, SquatDetector, confetti */
+/* global io, SquatDetector, FormCoach, confetti */
 
 import {
   PoseLandmarker,
@@ -137,6 +137,20 @@ let lastDepthPhase     = '';     // 'descending' | 'hold' | 'drive'
 const TARGET_DEPTH_ANGLE = 95;   // consider "at depth" when knee ≤ 95°
 const HOLD_DURATION_MS   = 500;  // say "Hold!" for ~0.5s, then "Drive up!"
 
+// ==========================================================================
+// FORM COACH — streak-based correction system
+// ==========================================================================
+const formCoach = new FormCoach();
+
+// Per-rep metric accumulators (reset each rep)
+let repMinKneeAngle   = null;   // lowest knee angle during this rep
+let repMaxForwardLean  = 0;     // max hip-ankle x offset (normalised)
+let repHoldMs          = 0;     // ms spent at depth (≤ target angle)
+let repKneeValgusRatio = null;  // kneeWidth / hipWidth from front cam (sampled at deepest point)
+
+// Front camera valgus sampling
+let latestFrontValgusRatio = null;  // updated each front-cam frame
+
 // Hand gesture state
 let handRaisedSince  = 0;
 let gestureTriggered = false;
@@ -237,6 +251,20 @@ function frontDetectLoop() {
     // Only draw skeleton overlay when hand tracking is on
     if (handTrackingOn) {
       drawSkeleton(frontCtx, frontCanvas.width, frontCanvas.height, lm);
+    }
+
+    // Sample knee valgus from front camera (only during workout)
+    if (!menuActive && !endScreenActive && !isPaused && !workoutDone) {
+      const lk = lm[LM.LEFT_KNEE], rk = lm[LM.RIGHT_KNEE];
+      const lh = lm[LM.LEFT_HIP],  rh = lm[LM.RIGHT_HIP];
+      if (lk.visibility > 0.4 && rk.visibility > 0.4 &&
+          lh.visibility > 0.4 && rh.visibility > 0.4) {
+        const kneeWidth = Math.abs(lk.x - rk.x);
+        const hipWidth  = Math.abs(lh.x - rh.x);
+        if (hipWidth > 0.01) {
+          latestFrontValgusRatio = kneeWidth / hipWidth;
+        }
+      }
     }
 
     if (menuActive || endScreenActive) {
@@ -368,6 +396,31 @@ socket.on('pose-update', (data) => {
 
   if (!result.trackingLost) {
     trackingWarning.style.display = 'none';
+
+    // ---- Accumulate per-rep form metrics ----
+    const { kneeAngle } = result;
+    if (kneeAngle !== null) {
+      if (repMinKneeAngle === null || kneeAngle < repMinKneeAngle) {
+        repMinKneeAngle = kneeAngle;
+        // Snapshot valgus at the deepest point
+        if (latestFrontValgusRatio !== null) {
+          repKneeValgusRatio = latestFrontValgusRatio;
+        }
+      }
+      // Forward lean: how far hip.x is ahead of ankle.x (side view, normalised)
+      const hip = data.landmarks.hip;
+      const ankle = data.landmarks.ankle;
+      if (hip && ankle) {
+        const lean = hip.x - ankle.x; // positive = leaning forward
+        if (lean > repMaxForwardLean) repMaxForwardLean = lean;
+      }
+    }
+    // Hold time accumulation (when at depth)
+    if (reachedTargetDepth && kneeAngle !== null && kneeAngle <= TARGET_DEPTH_ANGLE) {
+      // Approximate: each pose-update is ~33ms at 30fps
+      repHoldMs += 33;
+    }
+
     updateCoaching(result, setReps);
 
     // Check set completion
@@ -473,12 +526,46 @@ function updateCoaching(result, setReps) {
       reachedTargetDepth = false;
       reachedDepthTime   = 0;
       lastDepthPhase     = '';
-      showFeedback(pickFeedback());
-      const remaining = REPS_PER_SET - setReps;
-      if (remaining > 0 && remaining <= 3) {
-        setCue(remaining + ' more to go!', true);
-      } else {
-        setCue('Keep going!', true);
+
+      // ---- Form Coach: evaluate this rep ----
+      const coachResult = formCoach.recordRep({
+        minKneeAngle:    repMinKneeAngle,
+        maxForwardLean:  repMaxForwardLean,
+        kneeValgusRatio: repKneeValgusRatio,
+        holdMs:          repHoldMs,
+      });
+      // Reset per-rep accumulators for next rep
+      repMinKneeAngle   = null;
+      repMaxForwardLean  = 0;
+      repHoldMs          = 0;
+      repKneeValgusRatio = null;
+
+      // Handle cleared issues (positive reinforcement)
+      if (coachResult.clearedIssues.length > 0) {
+        const msg = formCoach.getClearedMessage(coachResult.clearedIssues[0]);
+        showFeedback(msg || pickFeedback());
+        setCue(msg || 'Keep going!', true, true);
+        coachingCueEl.classList.remove('correction');
+        coachingCueEl.classList.add('correction-cleared');
+        setTimeout(() => coachingCueEl.classList.remove('correction-cleared'), 2000);
+      }
+      // Handle new or ongoing correction
+      else if (coachResult.correction) {
+        setCue(coachResult.correction, true, true);
+        coachingCueEl.classList.add('correction');
+        coachingCueEl.classList.remove('correction-cleared');
+        showFeedback('');  // suppress random positive feedback during correction
+      }
+      // Normal positive feedback
+      else {
+        coachingCueEl.classList.remove('correction', 'correction-cleared');
+        showFeedback(pickFeedback());
+        const remaining = REPS_PER_SET - setReps;
+        if (remaining > 0 && remaining <= 3) {
+          setCue(remaining + ' more to go!', true);
+        } else {
+          setCue('Keep going!', true);
+        }
       }
     }
     lastState = state;
@@ -566,6 +653,7 @@ function resetTimer() {
 // ==========================================================================
 resetBtn.addEventListener('click', () => {
   squat.reset();
+  formCoach.reset();
   currentSet = 1;
   isPaused = false;
   workoutDone = false;
@@ -574,12 +662,14 @@ resetBtn.addEventListener('click', () => {
   reachedTargetDepth = false;
   reachedDepthTime   = 0;
   lastDepthPhase     = '';
+  repMinKneeAngle = null; repMaxForwardLean = 0; repHoldMs = 0; repKneeValgusRatio = null;
   repCountEl.textContent = '0';
   feedbackEl.textContent = '';
   feedbackEl.style.opacity = '0';
   trackingWarning.style.display = 'none';
   pauseOverlay.style.display = 'none';
   setCompleteOvl.style.display = 'none';
+  coachingCueEl.classList.remove('correction', 'correction-cleared');
   updateSetUI();
   setCue('Go down when ready', false, true);
   resetTimer();
@@ -654,23 +744,43 @@ function playApplause() {
 }
 
 // ==========================================================================
-// 9. DRAW SKELETON
+// 9. DRAW SKELETON (with optional form-correction highlights)
 // ==========================================================================
 function drawSkeleton(ctx, w, h, landmarks) {
-  ctx.strokeStyle = 'rgba(0, 210, 160, 0.8)';
+  const highlights = formCoach.getHighlightIndices(); // Set of landmark indices to highlight
+
+  // ---- Draw connections ----
   ctx.lineWidth = 3;
   for (const [i, j] of CONNECTIONS) {
     const a = landmarks[i], b = landmarks[j];
     if (a.visibility > 0.3 && b.visibility > 0.3) {
+      // Amber if either end is highlighted
+      ctx.strokeStyle = (highlights.has(i) || highlights.has(j))
+        ? 'rgba(255, 180, 50, 0.9)'
+        : 'rgba(0, 210, 160, 0.8)';
       ctx.beginPath(); ctx.moveTo(a.x * w, a.y * h); ctx.lineTo(b.x * w, b.y * h); ctx.stroke();
     }
   }
+
+  // ---- Draw keypoints ----
   for (const idx of ALL_KEYPOINTS) {
     const pt = landmarks[idx];
     if (pt.visibility > 0.3) {
-      ctx.beginPath(); ctx.arc(pt.x * w, pt.y * h, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = 'rgba(124, 108, 240, 0.9)'; ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+      const isHighlighted = highlights.has(idx);
+      const radius = isHighlighted ? 7 : 5;
+
+      ctx.beginPath(); ctx.arc(pt.x * w, pt.y * h, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = isHighlighted ? 'rgba(255, 160, 40, 0.95)' : 'rgba(124, 108, 240, 0.9)';
+      ctx.fill();
+      ctx.strokeStyle = isHighlighted ? 'rgba(255, 100, 20, 0.8)' : '#fff';
+      ctx.lineWidth = isHighlighted ? 2.5 : 1.5;
+      ctx.stroke();
+
+      // Pulsing glow on highlighted joints
+      if (isHighlighted) {
+        ctx.beginPath(); ctx.arc(pt.x * w, pt.y * h, 12, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(255, 160, 40, 0.15)'; ctx.fill();
+      }
     }
   }
 }
@@ -856,6 +966,7 @@ function selectWorkout(workoutId) {
 
   // Reset workout state
   squat.reset();
+  formCoach.reset();
   currentSet = 1;
   isPaused = false;
   workoutDone = false;
@@ -864,12 +975,14 @@ function selectWorkout(workoutId) {
   reachedTargetDepth = false;
   reachedDepthTime   = 0;
   lastDepthPhase     = '';
+  repMinKneeAngle = null; repMaxForwardLean = 0; repHoldMs = 0; repKneeValgusRatio = null;
   repCountEl.textContent = '0';
   feedbackEl.textContent = '';
   feedbackEl.style.opacity = '0';
   trackingWarning.style.display = 'none';
   pauseOverlay.style.display = 'none';
   setCompleteOvl.style.display = 'none';
+  coachingCueEl.classList.remove('correction', 'correction-cleared');
   updateSetUI();
   resetTimer();
   setCue('Go down when ready', false, true);
