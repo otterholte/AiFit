@@ -68,6 +68,8 @@ const setCompleteTxt   = document.getElementById('set-complete-text');
 const resetBtn         = document.getElementById('reset-btn');
 const frontDot         = document.getElementById('front-dot');
 const sideDot          = document.getElementById('side-dot');
+const correctionBanner     = document.getElementById('correction-banner');
+const correctionBannerText = document.getElementById('correction-banner-text');
 
 const frontVideo       = document.getElementById('front-webcam');
 const frontCanvas      = document.getElementById('front-overlay');
@@ -548,6 +550,7 @@ function updateCoaching(result, setReps) {
         coachingCueEl.classList.remove('correction');
         coachingCueEl.classList.add('correction-cleared');
         setTimeout(() => coachingCueEl.classList.remove('correction-cleared'), 2000);
+        showCorrectionBanner(msg || 'Looking good!', true, 3000);
       }
       // Handle new or ongoing correction
       else if (coachResult.correction) {
@@ -555,10 +558,12 @@ function updateCoaching(result, setReps) {
         coachingCueEl.classList.add('correction');
         coachingCueEl.classList.remove('correction-cleared');
         showFeedback('');  // suppress random positive feedback during correction
+        showCorrectionBanner(coachResult.correction, false, 5000);
       }
       // Normal positive feedback
       else {
         coachingCueEl.classList.remove('correction', 'correction-cleared');
+        hideCorrectionBanner();
         showFeedback(pickFeedback());
         const remaining = REPS_PER_SET - setReps;
         if (remaining > 0 && remaining <= 3) {
@@ -613,6 +618,33 @@ function setCue(text, highlight = false, force = false) {
   lastCueTime = now;
   coachingCueEl.textContent = text;
   coachingCueEl.classList.toggle('highlight', highlight);
+}
+
+// ---- Correction banner (large, center-screen) ----
+let correctionBannerTimer = null;
+function showCorrectionBanner(text, isCleared = false, durationMs = 4000) {
+  if (!correctionBanner || !correctionBannerText) return;
+  clearTimeout(correctionBannerTimer);
+  correctionBannerText.textContent = text;
+  correctionBanner.classList.remove('fade-out', 'cleared');
+  if (isCleared) correctionBanner.classList.add('cleared');
+  correctionBanner.style.display = '';
+  // Force reflow so animation replays
+  void correctionBanner.offsetWidth;
+  correctionBanner.style.animation = 'none';
+  void correctionBanner.offsetWidth;
+  correctionBanner.style.animation = '';
+
+  correctionBannerTimer = setTimeout(() => {
+    correctionBanner.classList.add('fade-out');
+    setTimeout(() => { correctionBanner.style.display = 'none'; }, 400);
+  }, durationMs);
+}
+
+function hideCorrectionBanner() {
+  if (!correctionBanner) return;
+  clearTimeout(correctionBannerTimer);
+  correctionBanner.style.display = 'none';
 }
 
 const FEEDBACK_LINES = ['Nice rep!', 'Solid!', 'Good form!', 'Strong!', 'Keep it up!', 'Smooth!', 'Nailed it!', 'Clean!'];
@@ -670,6 +702,7 @@ resetBtn.addEventListener('click', () => {
   pauseOverlay.style.display = 'none';
   setCompleteOvl.style.display = 'none';
   coachingCueEl.classList.remove('correction', 'correction-cleared');
+  hideCorrectionBanner();
   updateSetUI();
   setCue('Go down when ready', false, true);
   resetTimer();
@@ -983,6 +1016,7 @@ function selectWorkout(workoutId) {
   pauseOverlay.style.display = 'none';
   setCompleteOvl.style.display = 'none';
   coachingCueEl.classList.remove('correction', 'correction-cleared');
+  hideCorrectionBanner();
   updateSetUI();
   resetTimer();
   setCue('Go down when ready', false, true);

@@ -253,21 +253,49 @@ body {
   transition: color 0.3s, opacity 0.3s;
 }
 .coaching-cue.highlight { color: var(--green); }
-.coaching-cue.correction {
+.coaching-cue.correction { color: var(--yellow); }
+.coaching-cue.correction-cleared { color: var(--green); }
+
+/* ---- Correction banner (center-screen overlay) ---- */
+.correction-banner {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 160;
+  background: rgba(255, 180, 50, 0.12);
+  border: 1px solid rgba(255, 180, 50, 0.35);
+  border-radius: 18px;
+  padding: 22px 48px;
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  text-align: center;
+  pointer-events: none;
+  animation: bannerIn 0.35s ease-out;
+  max-width: 90vw;
+}
+.correction-banner span {
+  font-size: 1.7rem;
+  font-weight: 700;
   color: var(--yellow);
-  animation: correctionPulse 2s ease-in-out infinite;
+  text-shadow: 0 2px 16px rgba(255, 180, 50, 0.25);
 }
-.coaching-cue.correction-cleared {
+.correction-banner.cleared {
+  background: rgba(0, 210, 160, 0.12);
+  border-color: rgba(0, 210, 160, 0.35);
+}
+.correction-banner.cleared span {
   color: var(--green);
-  animation: correctionCleared 0.6s ease-out;
+  text-shadow: 0 2px 16px rgba(0, 210, 160, 0.25);
 }
-@keyframes correctionPulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.65; }
+@keyframes bannerIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
-@keyframes correctionCleared {
-  0%   { transform: scale(1.15); }
-  100% { transform: scale(1); }
+.correction-banner.fade-out {
+  animation: bannerOut 0.4s ease-in forwards;
+}
+@keyframes bannerOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
 }
 .bottom-right { display: flex; align-items: center; gap: 16px; }
 .feedback {
