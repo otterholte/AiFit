@@ -27,7 +27,7 @@ class FormCoach {
     // ---- Thresholds ----
     this.DEPTH_ANGLE_OK       = options.depthAngle       || 95;    // must reach ≤ 95° (thighs near parallel)
     this.FORWARD_LEAN_LIMIT   = options.forwardLeanLimit  || 55;    // torso angle from vertical (normal squat 30-50°, flag only severe)
-    this.VALGUS_RATIO_LIMIT   = options.valgusRatioLimit  || 0.92;  // kneeWidth / ankleWidth < this = knees caving inside ankles
+    this.VALGUS_RATIO_LIMIT   = options.valgusRatioLimit  || 0.70;  // kneeWidth / ankleWidth < this = severe cave-in (feet angle out naturally)
     this.MIN_HOLD_MS          = options.minHoldMs         || 400;   // ms at depth
     this.HEEL_RISE_LIMIT      = options.heelRiseLimit     || 0.025; // normalised ankle-Y rise (side cam)
     this.HIP_SHIFT_LIMIT      = options.hipShiftLimit     || 0.04;  // normalised lateral hip drift (front cam)

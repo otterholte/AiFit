@@ -809,7 +809,7 @@ function updateDebugOverlay(kneeAngle, leanDeg, ar) {
     `Knee: ${kneeAngle !== null ? kneeAngle + '°' : '--'}  (down<115° good<95°)`,
     `Lean: ${leanDeg !== null ? leanDeg.toFixed(1) + '°' : '--'}  (warn>55°)`,
     `AR: ${ar.toFixed(2)}  MinKnee: ${repMinKneeAngle ?? '--'}°  MaxLean: ${repMaxForwardLean.toFixed(1)}°`,
-    `Hold: ${repHoldMs}ms  Valgus(knee/ankle): ${repKneeValgusRatio !== null ? repKneeValgusRatio.toFixed(2) : '--'} (warn<0.92)`,
+    `Hold: ${repHoldMs}ms  Valgus(knee/ankle): ${repKneeValgusRatio !== null ? repKneeValgusRatio.toFixed(2) : '--'} (warn<0.70)`,
     `HeelRise: ${(repMaxHeelRise * 100).toFixed(1)}%  HipShift: ${(repMaxHipShift * 100).toFixed(1)}%`,
     `Streaks: depth=${streaks.shallowDepth?.badStreak||0} lean=${streaks.forwardLean?.badStreak||0} valgus=${streaks.kneeValgus?.badStreak||0} heel=${streaks.heelRise?.badStreak||0} hip=${streaks.hipShift?.badStreak||0} hold=${streaks.shortHold?.badStreak||0}`,
     `Watch: ${[...formCoach.getWatchIssues()].join(', ') || 'none'}`,
