@@ -113,14 +113,15 @@ server.listen(PORT, '0.0.0.0', async () => {
     }
   }
 
-  const dashUrl = `https://localhost:${PORT}/dashboard`;
+  const dashUrl = `https://${lanIP}:${PORT}/dashboard`;
+  const sideUrl = `https://${lanIP}:${PORT}/side`;
 
   console.log('');
   console.log('==========================================');
   console.log('  AI FIT — Server Running');
   console.log('==========================================');
   console.log(`  Dashboard (laptop):  ${dashUrl}`);
-  console.log(`  Side cam  (phone):   https://${lanIP}:${PORT}/side`);
+  console.log(`  Side cam  (phone):   ${sideUrl}`);
   console.log('==========================================');
   console.log('  Accept the self-signed cert warning ONCE');
   console.log('  in each browser — it won\'t ask again.');
